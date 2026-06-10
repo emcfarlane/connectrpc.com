@@ -8,6 +8,20 @@ specification includes [mappings to and from JSON][protojson], any Connect API
 defined with a Protobuf schema also supports JSON. This is especially
 convenient for web browsers and ad-hoc debugging with cURL.
 
+<!-- TODO(v2): Rewrite for the v2 codec layout:
+- The built-in Protobuf binary and JSON codecs now live in
+  connectrpc.com/connect/v2/connectproto (connectproto.NewBinaryCodec(),
+  connectproto.NewJSONCodec(), both accepting WithTypeResolver). connecthttp
+  installs them by default.
+- WithProtoJSON() is replaced by selecting the send codec on the transport:
+  connecthttp.WithSendCodec(connect.CodecNameJSON).
+- WithCodec is replaced by connecthttp.WithCodecs(codecs...), which registers
+  codecs by their Name() on transports and servers.
+- The connect.Codec interface changed shape: MarshalAppend(ctx, dst, msg) and
+  Unmarshal(ctx, src, msg) — methods take a context and use append-style
+  buffers. StableCodec (MarshalAppendStable, IsBinary) is required for GET
+  support. Custom codec docs need a full update. -->
+
 Connect handlers automatically accept JSON-encoded requests &mdash; there's no
 special configuration required. Connect clients default to using binary
 Protobuf. To configure your client to use JSON instead, use the
@@ -44,6 +58,14 @@ are usually larger than requests, this approach compresses most of the data on
 the network without requiring the client to make any assumptions about the
 server.
 
+<!-- TODO(v2): Update for the v2 compression layout:
+- gzip now lives in connectrpc.com/connect/v2/connectgzip
+  (connectgzip.New(), with a WithLevel option). connecthttp installs it by
+  default.
+- WithSendGzip is replaced by
+  connecthttp.WithSendCompressor(connect.CompressionNameGzip).
+- WithCompressMinBytes moved verbatim to connecthttp.WithCompressMinBytes. -->
+
 By default, Connect handlers support gzip compression using the standard
 library's `compress/gzip` at the default compression level. Connect clients
 default to sending uncompressed requests and asking for gzipped responses. If
@@ -64,6 +86,17 @@ inspector tab automatically decompresses the data if necessary. Connect's
 `Accept-Encoding` support also works well with cURL's `--compressed` flag.
 
 ## Custom compression
+
+<!-- TODO(v2): Rewrite for the v2 compressor API:
+- The separate Compressor/Decompressor interfaces are replaced by a single
+  connect.Compressor interface: Name(), CompressAppend(ctx, dst, src), and
+  DecompressAppend(ctx, dst, src).
+- WithCompression and WithAcceptCompression are replaced by
+  connecthttp.WithCompressors(compressors...), used for both transports and
+  servers; WithSendCompression becomes connecthttp.WithSendCompressor(name).
+- connect-go now ships a Zstandard implementation in
+  connectrpc.com/connect/v2/connectzstd — mention it as the worked example
+  instead of (or alongside) hand-rolling. -->
 
 In Go, Connect comes with gzip support because it's widely used and included in
 the standard library. To support newer compression algorithms, like Brotli or

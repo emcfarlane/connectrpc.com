@@ -33,6 +33,11 @@ traditional HTTP checks, use `connectrpc.com/grpchealth`.
 
 ## Clients
 
+<!-- TODO(v2): WithGRPC/WithGRPCWeb are replaced by the transport option
+connecthttp.WithProtocol(connect.ProtocolNameGRPC) or
+connecthttp.WithProtocol(connect.ProtocolNameGRPCWeb), passed to
+connecthttp.NewTransport. -->
+
 Clients default to using the Connect protocol. To use the gRPC or gRPC-Web
 protocols, use the `WithGRPC` or `WithGRPCWeb` options during client
 construction. If the gRPC server is using TLS, Connect clients work with no
@@ -48,6 +53,16 @@ features and will need a slightly different approach. Unlike many RPC framework
 migrations, remember that you do _not_ need to modify your service's clients:
 they can continue to use their current gRPC clients. Your current Protobuf
 schema will also work without modification.
+
+<!-- TODO(v2): Rewrite the migration steps below for v2. The v1 instructions
+about connect.Request/connect.Response wrappers no longer apply — v2 handlers
+and clients use plain Protobuf messages, and metadata IS context-based
+(connect.ServerInfoForContext / connect.NewClientContext), which is actually
+closer to grpc-go's model. Also: connect.NewError now takes a string message,
+server setup is connect.NewServer + RegisterXHandler + connecthttp.Mount, and
+clients use connecthttp.NewTransport with
+connecthttp.WithProtocol(connect.ProtocolNameGRPC). Mention that grpcreflect
+and grpchealth ship v2-compatible modules. -->
 
 The particulars of your codebase will be unique, but most migrations include a
 few common steps:

@@ -10,6 +10,19 @@ the Connect protocol.
 
 ## Working with errors
 
+<!-- TODO(v2): Rewrite this section for the new error semantics. This is a real
+behavior change, not just a rename:
+- connect.NewError now takes a string message: NewError(code Code, message
+  string). connect.Errorf(code, format, args...) is the printf variant.
+- Only the explicit message is serialized to the wire. A bare error returned
+  from a handler becomes CodeUnknown with NO wire message — v1's behavior of
+  sending err.Error() verbatim is gone. Call out the privacy flip.
+- Attach an underlying error with (*Error).WithCause(err). The cause is
+  available to errors.Is/errors.As locally but is never serialized.
+- Errors received from a client call are marked remote ((*Error).IsRemote()).
+  Returning a remote error from a handler is rewritten to a bare CodeInternal;
+  handlers must translate downstream errors into explicit local errors. -->
+
 At their simplest, `connect-go` errors attach an [error
 code](/docs/protocol/#error-codes) to a standard Go error. The error code and
 the underlying error's `Error()` string are sent over the network to the
@@ -47,6 +60,12 @@ Regardless of the protocol in use, Connect clients automatically unmarshal
 response data into a standard Go error. Use Connect's `CodeOf` function and the
 standard library's `errors.As` to inspect errors:
 
+<!-- TODO(v2): Update the client example below: construct the client with
+connect.NewClient(connecthttp.NewTransport(http.DefaultClient,
+"http://localhost:8080")) and pass it to greetv1connect.NewGreetServiceClient.
+Mention (*Error).IsRemote() for distinguishing the peer's verdict from local
+errors (replaces v1 IsWireError). -->
+
 ```go
 client := greetv1connect.NewGreetServiceClient(
 	http.DefaultClient,
@@ -71,6 +90,17 @@ These APIs work for all three supported protocols, even if the server isn't
 built with Connect.
 
 ## Error Details
+
+<!-- TODO(v2): Rewrite this section for the v2 details API:
+- The ErrorDetail wrapper type, NewErrorDetail, and AddDetail are gone.
+- Servers attach details with (*Error).WithDetail(detail any), which returns a
+  cloned error: err = err.WithDetail(retryInfo). For connecthttp protocols, a
+  detail may be a proto.Message (wrapped in Any at encode time) or an
+  *anypb.Any.
+- (*Error).Details() returns []any. The concrete detail types are
+  transport-defined; for connecthttp's Connect/gRPC/gRPC-Web protocols,
+  received details are *anypb.Any values, so the client example must unmarshal
+  with anypb.UnmarshalNew (or check TypeUrl) instead of detail.Value(). -->
 
 Like `grpc-go`, `connect-go` allows servers to enrich errors with more than
 just a code and a string. Since Connect focuses on schema-first APIs, this

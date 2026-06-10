@@ -22,6 +22,10 @@ and how to call your new API.
 
 ## Install tools
 
+<!-- TODO(v2): Update the generator module path to
+connectrpc.com/connect/v2/cmd/protoc-gen-connect-go. The binary name is
+unchanged. -->
+
 First, we'll need to create a new Go module and install some code generation
 tools:
 
@@ -101,6 +105,9 @@ breaking:
     - FILE
 ```
 
+<!-- TODO(v2): Remove the `simple` opt from buf.gen.yaml below. v2 output is
+simple-only and the plugin errors if the option is set. -->
+
 Next, tell Buf how to generate code by putting this into
 [`buf.gen.yaml`][buf.gen.yaml]:
 
@@ -154,6 +161,17 @@ interfaces and constructors. Feel free to poke around if you're interested
 &mdash; `greet.connect.go` is just over 100 lines of code, including comments.
 
 ## Implement handler
+
+<!-- TODO(v2): Rewrite the server example for the v2 API:
+- Imports become connectrpc.com/connect/v2, connectrpc.com/connect/v2/connecthttp,
+  and connectrpc.com/validate/v2.
+- Construction becomes:
+    server := connect.NewServer(validate.NewServerInterceptor())
+    greetv1connect.RegisterGreetServiceHandler(server, greeter)
+    mux := http.NewServeMux()
+    connecthttp.Mount(mux, server)
+  There is no NewGreetServiceHandler returning (path, http.Handler), and
+  interceptors are passed to NewServer instead of connect.WithInterceptors. -->
 
 The code we've generated takes care of the boring boilerplate, but we still
 need to implement our greeting logic. In the generated code, this is
@@ -213,6 +231,9 @@ func main() {
 In a separate terminal window, you can now update `go.mod` and start your
 server:
 
+<!-- TODO(v2): Update module paths: go get connectrpc.com/connect/v2 and
+connectrpc.com/validate/v2. -->
+
 ```shellsession
 $ go get connectrpc.com/connect
 $ go get connectrpc.com/validate
@@ -268,6 +289,14 @@ $ buf curl \
 
 We can also make requests using Connect's generated client. `mkdir -p
 cmd/client` and put this in `cmd/client/main.go`:
+
+<!-- TODO(v2): Rewrite the client example for the v2 API:
+    client := connect.NewClient(
+        connecthttp.NewTransport(http.DefaultClient, "http://localhost:8080"),
+    )
+    greetClient := greetv1connect.NewGreetServiceClient(client)
+  The generated constructor takes a *connect.Client instead of an HTTP client
+  and base URL. -->
 
 ```go
 package main
@@ -342,6 +371,15 @@ Congratulations &mdash; you've built your first Connect service! 🎉
 - The gRPC-Web protocol used by [grpc/grpc-web][grpc-web], allowing
   `connect-go` servers to interop with `grpc-web` frontends without the need
   for an intermediary proxy (such as Envoy).
+
+<!-- TODO(v2): WithGRPC/WithGRPCWeb are replaced by the connecthttp.WithProtocol
+transport option:
+    transport := connecthttp.NewTransport(
+        http.DefaultClient,
+        "http://localhost:8080",
+        connecthttp.WithProtocol(connect.ProtocolNameGRPC),
+    )
+  Update the prose and example below accordingly. -->
 
 By default, `connect-go` servers support ingress from all three protocols
 without any configuration. `connect-go` clients use the Connect protocol by

@@ -9,6 +9,23 @@ functionality.
 If you followed the [getting started](/docs/go/getting-started/) guide, you've already seen an interceptor in action:
 the [validate-go](https://github.com/connectrpc/validate-go/) interceptor powers the Protovalidate integration that made sure every `GreetRequest` contained a valid name.
 
+<!-- TODO(v2): Rewrite this page for the unified interceptor model. There is no
+unary/streaming split anymore: every RPC — including unary — is modeled as a
+stream, and interceptors come in client and server flavors:
+
+    type ClientFunc func(ctx context.Context, spec Spec, stream ClientStream) error
+    type ServerFunc func(ctx context.Context, spec Spec, stream ServerStream) error
+    type ClientInterceptor func(next ClientFunc) ClientFunc
+    type ServerInterceptor func(next ServerFunc) ServerFunc
+
+UnaryFunc, AnyRequest/AnyResponse, UnaryInterceptorFunc, and the Interceptor
+interface are gone, as is Spec().IsClient — the client/server distinction is
+now in the type system. Explain the unary-as-stream model: a unary RPC is a
+stream that sends and receives exactly one message, and interceptors that need
+to inspect messages wrap the stream before calling next. Headers are reached
+through CallInfo (connect.ClientInfoForContext / connect.ServerInfoForContext).
+Use the slog logging interceptor from the v2 announcement as the example. -->
+
 On this page you'll learn how to build unary interceptors &mdash; more complex use
 cases are covered in the [streaming documentation](/docs/go/streaming/).
 
@@ -77,6 +94,24 @@ func NewAuthInterceptor() connect.UnaryInterceptorFunc {
 
 To apply our new interceptor to handlers or clients, we can use
 `WithInterceptors`:
+
+<!-- TODO(v2): connect.WithInterceptors is gone. Interceptors are passed
+directly to the constructors:
+
+    // For handlers:
+    server := connect.NewServer(
+        NewAuthInterceptor(),
+        validate.NewServerInterceptor(),
+    )
+    greetv1connect.RegisterGreetServiceHandler(server, &GreetServer{})
+
+    // For clients:
+    client := connect.NewClient(
+        connecthttp.NewTransport(http.DefaultClient, "http://localhost:8080"),
+        NewAuthInterceptor(),
+    )
+
+Interceptors fire in argument order; the first wraps the outermost call. -->
 
 ```go
 // For handlers:

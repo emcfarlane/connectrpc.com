@@ -38,6 +38,23 @@ It is still necessary to opt-in to HTTP GET on your client, as well. If you are
 using a Go client, you would specify the `WithHTTPGet` option when creating the
 Connect client.
 
+<!-- TODO(v2): connect.WithHTTPGet is replaced by the transport option
+connecthttp.WithGET(maxURLBytes int), which enables GET for idempotent unary
+RPCs and falls back to POST when the encoded URL would exceed maxURLBytes
+(there is no separate WithHTTPGetMaxURLSize):
+
+    client := connect.NewClient(
+        connecthttp.NewTransport(
+            http.DefaultClient,
+            "http://localhost:8080",
+            connecthttp.WithGET(8192),
+        ),
+    )
+    greetClient := greetv1connect.NewGreetServiceClient(client)
+
+Also mention connecthttp.NewNotModifiedError for handlers returning 304s, and
+drop the v1.7.0 version note — v2 supports GET from the start. -->
+
 ```go
 client := greetv1connect.NewGreetServiceClient(
 	http.DefaultClient,
@@ -65,6 +82,9 @@ should also set the appropriate headers.
 For example, you may wish to set the `Cache-Control` header with a `max-age`
 directive:
 
+<!-- TODO(v2): connect.CallInfoForHandlerContext(ctx) (info, ok) becomes
+connect.ServerInfoForContext(ctx), returning *CallInfo directly. -->
+
 ```go
 callInfo, ok := connect.CallInfoForHandlerContext(ctx)
 if ok {
@@ -85,6 +105,13 @@ appropriate, for example, for authenticated requests.
 In some cases, you might want to introduce behavior that only occurs when
 handling HTTP GET requests. This can be accomplished using the `HTTPMethod` method
 on the `CallInfo` type in context:
+
+<!-- TODO(v2): HTTPMethod is no longer on the core CallInfo — HTTP-specific
+details live on the connecthttp server info:
+
+    info := connecthttp.ServerInfoForContext(ctx)
+    if info != nil && info.HTTPMethod() == http.MethodGet { ... }
+-->
 
 ```go
 callInfo, ok := connect.CallInfoForHandlerContext(ctx)

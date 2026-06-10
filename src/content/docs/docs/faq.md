@@ -165,6 +165,13 @@ underlying implementation allows us to do so.
 
 ### Why use generics?
 
+<!-- TODO(v2): This answer is v1-specific. connect-go v2 removed the generic
+Request/Response wrappers and the generic stream types: unary RPCs use plain
+Protobuf messages, streaming RPCs use generated per-RPC typed wrappers, and
+metadata moved to context via CallInfo. Rewrite as a "Why did v2 drop
+generics?" answer (signature noise, unfamiliar pattern, metadata rarely used —
+see the v2 announcement) or remove the section. -->
+
 Generic code is inherently more complex than non-generic code. Still, introducing
 generics to Connect-Go eliminated two significant sources of complexity:
 
@@ -282,6 +289,12 @@ You can customize the error message by providing a different `Codec`. Code
 and details can't be customized.
 
 ### How do I use custom JSON options like `EmitUnpopulated` in Connect-Go?
+
+<!-- TODO(v2): Re-answer for v2. The built-in codecs now live in
+connectrpc.com/connect/v2/connectproto; custom marshaling options are handled
+by implementing connect.Codec (wrapping protojson with the desired options)
+and registering it with connecthttp.WithCodecs. The third-party
+akshayjshah/connectproto link is v1-only. -->
 
 You can use these options by customizing the codec. https://github.com/akshayjshah/connectproto is a handy project that
 makes this easier.

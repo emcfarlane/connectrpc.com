@@ -47,6 +47,11 @@ service GreetService {
 }
 ```
 
+<!-- TODO(v2): The generic stream types are gone. The generator now emits
+per-RPC typed wrappers (e.g. GreetGreetHandlerStream, GreetGreetClientStream)
+over the connect.ServerStream and connect.ClientStream interfaces. Update the
+type names in all three "Streaming variants" paragraphs below. -->
+
 In Go, client streaming RPCs use the `ClientStream` and `ClientStreamForClient`
 types.
 
@@ -112,6 +117,12 @@ a `CallInfo` type in context.
 
 ## Interceptors
 
+<!-- TODO(v2): Rewrite this section. v2 unifies unary and streaming
+interceptors: a connect.ClientInterceptor or connect.ServerInterceptor wraps
+every RPC as a stream, so there is no separate streaming interceptor surface.
+The Interceptor interface, UnaryInterceptorFunc, StreamingClientConn, and
+StreamingHandlerConn no longer exist. -->
+
 Streaming interceptors are naturally more complex than unary interceptors.
 Rather than using `UnaryInterceptorFunc`, streaming interceptors must implement
 the full `Interceptor` interface. This may require implementing a
@@ -147,6 +158,29 @@ service GreetService {
 
 After running `buf generate` to update our generated code, we can amend our
 handler implementation in `cmd/server/main.go`:
+
+<!-- TODO(v2): Rewrite the handler example below for the v2 API:
+- Signature becomes Greet(ctx context.Context, stream
+  greetv1connect.GreetGreetHandlerStream) (*greetv1.GreetResponse, error).
+- The receive loop becomes:
+    for {
+        req, err := stream.Receive(ctx)
+        if errors.Is(err, io.EOF) {
+            break
+        }
+        if err != nil {
+            return nil, err
+        }
+        ...
+    }
+  There is no Receive() bool / Msg() / Err() pattern.
+- connect.CallInfoForHandlerContext(ctx) becomes
+  connect.ServerInfoForContext(ctx) (returns *CallInfo, no ok bool).
+- connect.NewError now takes a string message: use connect.NewError(code, msg)
+  or connect.Errorf(code, format, args...). Wrap an underlying error with
+  .WithCause(err) — the cause is local-only and not sent on the wire.
+- main() changes to connect.NewServer + RegisterGreetServiceHandler +
+  connecthttp.Mount as in Getting Started. -->
 
 ```go
 package main
@@ -215,6 +249,15 @@ func main() {
 	s.ListenAndServe()
 }
 ```
+
+<!-- TODO(v2): Rewrite the interceptor example below. In v2 the auth
+interceptor from the interceptors page already handles streaming RPCs because
+interceptors wrap every RPC as a stream — there is no separate WrapUnary /
+WrapStreamingClient / WrapStreamingHandler surface. Either drop this section or
+show the same connect.ClientInterceptor / connect.ServerInterceptor functions
+reading and setting headers via connect.ClientInfoForContext /
+connect.ServerInfoForContext. Interceptors are passed to connect.NewClient /
+connect.NewServer instead of connect.WithInterceptors. -->
 
 Now that we've implemented our new client streaming RPC, we'll also need to
 update our [simple authentication interceptor](/docs/go/interceptors/). To support

@@ -6,6 +6,23 @@ This page explains how to fix common errors when working with `connect-go`.
 Where possible, the Connect runtime recognizes these problems and includes a
 link to this page in the error message.
 
+<!-- TODO(v2): Both fixes on this page construct clients with the v1 API.
+Update to v2: clients are built with connect.NewClient over
+connecthttp.NewTransport, and WithGRPC becomes
+connecthttp.WithProtocol(connect.ProtocolNameGRPC):
+
+    client := connect.NewClient(
+        connecthttp.NewTransport(
+            httpClient, // h2c-enabled where needed
+            "http://localhost:8080",
+            connecthttp.WithProtocol(connect.ProtocolNameGRPC),
+        ),
+    )
+    greetClient := greetv1connect.NewGreetServiceClient(client)
+
+Also verify the quoted error strings ("possible missing connect.WithGRPC()
+client option...") against what v2 actually emits and update them. -->
+
 ## Client missing WithGRPC
 
 If you use a Connect client to call a `grpc-go` server but forget the `WithGRPC`

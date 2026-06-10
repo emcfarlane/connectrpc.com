@@ -28,6 +28,18 @@ Especially if you're serving your Connect API alongside other HTTP handlers, you
 may want to prefix your RPC routes with `/api/`, `/connect/`, or something similar.
 You can do this using `net/http`:
 
+<!-- TODO(v2): Update the example for v2. Handlers are mounted with
+connecthttp.Mount, which registers one route per procedure on any mux that
+implements Handle(pattern string, handler http.Handler):
+
+    server := connect.NewServer()
+    greetv1connect.RegisterGreetServiceHandler(server, &greetServer{})
+    api := http.NewServeMux()
+    connecthttp.Mount(api, server)
+
+The StripPrefix pattern below should still apply; verify it against the v2
+connecthttp handler before publishing. -->
+
 ```go mark={6}
 api := http.NewServeMux()
 api.Handle(greetv1connect.NewGreetServiceHandler(&greetServer{}))

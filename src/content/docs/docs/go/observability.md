@@ -37,9 +37,9 @@ passed directly to the constructors:
 
 Verify the exact constructor names and option set against the published
 otelconnect v2 module before release — the v2 module also fixes the metrics
-skew tracked in connect-go#665. Mention that connecthttp exposes per-call
-send/receive stats (connecthttp.ServerInfoForContext(ctx).SendStats() /
-ReceiveStats()) used by the new instrumentation. -->
+skew tracked in connect-go#665. Mention that connect.CallInfo exposes per-call
+message byte counts (the SendStats and ReceiveStats fields) used by the new
+instrumentation. -->
 
 Once you have OpenTelemetry set up in your application, enabling OpenTelemetry in a Connect project is as simple as adding the [otelconnect.NewInterceptor] option on Connect handler and client constructors. If you do not have OpenTelemetry in your application, you can refer to the [OpenTelemetry Go getting started guide](https://opentelemetry.io/docs/instrumentation/go/getting-started/).
 
@@ -75,7 +75,7 @@ By default, this will use:
 
 <!-- TODO(v2): Update the example below: the return type connect.Interceptor no
 longer exists. The client constructor returns a connect.ClientInterceptor and
-the server constructor a connect.ServerInterceptor; the options are unchanged
+the server constructor a connect.ServerInterceptor. The options are unchanged
 in shape. -->
 
 When running multiple applications in a single binary, or if different sections of code should use different exporters, pass the correct exporters to [otelconnect.NewInterceptor] explicitly:

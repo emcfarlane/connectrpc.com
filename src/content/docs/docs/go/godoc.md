@@ -9,9 +9,6 @@ Connect's Go API is extensively documented &mdash; see [pkg.go.dev][godoc] for m
 - connectrpc.com/connect/v2/connecthttp — net/http transport and server bindings
 - connectrpc.com/connect/v2/connectproto — Protobuf binary and JSON codecs
 - connectrpc.com/connect/v2/connectgzip — gzip compressor
-- connectrpc.com/connect/v2/connectzstd — Zstandard compressor
-- connectrpc.com/connect/v2/connectinprocess — in-process transport
-Confirm whether connectws (WebSocket transport) ships in the v2.0 release
-before listing it. -->
+- connectrpc.com/connect/v2/connectinprocess — in-process transport -->
 
 [godoc]: https://pkg.go.dev/connectrpc.com/connect

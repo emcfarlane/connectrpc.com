@@ -14,15 +14,18 @@ documentation](/docs/go/streaming/) covers headers and trailers for streaming RP
 
 <!-- TODO(v2): Update this section:
 - Headers are no longer net/http.Header. CallInfo methods return
-  *connect.Metadata, a transport-agnostic type with Get/Set/Add/Values/
-  SetValues/Delete/All/Len. Note Get returns (value string, ok bool).
+  *connect.Metadata, a transport-agnostic type with Get/Has/Values/Set/
+  SetValues/Add/Delete/All/Len. Get returns a single string. Has tests
+  presence.
 - connect.CallInfoForHandlerContext(ctx) (info, ok) is replaced by
-  connect.ServerInfoForContext(ctx), which returns *CallInfo directly (nil
+  connect.CallInfoForServerContext(ctx), which returns *CallInfo directly (nil
   outside a handler).
-- connect.NewClientContext is unchanged in shape; connect.ClientInfoForContext
-  reads it back inside interceptors.
-- HTTP-specific request info (TLS state, peer address, HTTP method, URL) lives
-  on connecthttp.ServerInfoForContext(ctx) / connecthttp.ClientInfoForContext. -->
+- connect.NewClientContext is unchanged in shape.
+  connect.CallInfoForClientContext reads it back inside interceptors.
+- HTTP-specific request info (TLS state, HTTP method, URL) lives on
+  connecthttp.ServerInfoForContext(ctx) / connecthttp.ClientInfoForContext.
+  The peer address and protocol are fields on connect.CallInfo (PeerAddr,
+  Protocol). -->
 
 Connect headers are just HTTP headers, modeled using the familiar `Header`
 type from `net/http`. Access to the headers is done via context, which should be
@@ -122,11 +125,10 @@ rely on your good judgment.
 
 ## Binary headers
 
-<!-- TODO(v2): connect.EncodeBinaryHeader and connect.DecodeBinaryHeader do not
-exist in v2. Decide the story here: either document encoding with the standard
-library (base64.RawStdEncoding, matching what v1's helpers did) or drop the
-examples and recommend error details / plain ASCII values. Update both
-examples; also note CallInfoForHandlerContext → ServerInfoForContext. -->
+<!-- TODO(v2): connect.EncodeBinaryHeader and connect.DecodeBinaryHeader are
+unchanged in v2, so both examples survive. Only update the CallInfo access
+(CallInfoForHandlerContext (info, ok) → CallInfoForServerContext, no ok bool)
+and the client construction to connect.NewClient(connecthttp.NewTransport(...)). -->
 
 To send non-ASCII values in headers, the gRPC and Connect protocols require
 base64 encoding. Suffix your key with "-Bin" and use Connect's
@@ -190,7 +192,7 @@ If you find yourself needing trailers, unary handlers and clients can access
 them much like headers:
 
 <!-- TODO(v2): Update the handler example below: CallInfoForHandlerContext →
-ServerInfoForContext (no ok bool). Client construction changes to
+CallInfoForServerContext (no ok bool). Client construction changes to
 connect.NewClient(connecthttp.NewTransport(...)). Verify the Trailer- prefix
 behavior described in the client comment still holds in v2's connecthttp. -->
 

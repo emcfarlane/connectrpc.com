@@ -13,18 +13,23 @@ the [validate-go](https://github.com/connectrpc/validate-go/) interceptor powers
 unary/streaming split anymore: every RPC — including unary — is modeled as a
 stream, and interceptors come in client and server flavors:
 
-    type ClientFunc func(ctx context.Context, spec Spec, stream ClientStream) error
+    type ClientFunc func(ctx context.Context, spec Spec) (ClientStream, error)
     type ServerFunc func(ctx context.Context, spec Spec, stream ServerStream) error
     type ClientInterceptor func(next ClientFunc) ClientFunc
     type ServerInterceptor func(next ServerFunc) ServerFunc
 
+Note the asymmetry: client interceptors wrap the *initialization* of the
+stream. To observe messages or the end of the RPC, wrap the returned
+ClientStream and its Close method. Server interceptors wrap the full
+lifecycle of the RPC, and the stream is closed when the ServerFunc returns.
 UnaryFunc, AnyRequest/AnyResponse, UnaryInterceptorFunc, and the Interceptor
 interface are gone, as is Spec().IsClient — the client/server distinction is
 now in the type system. Explain the unary-as-stream model: a unary RPC is a
 stream that sends and receives exactly one message, and interceptors that need
 to inspect messages wrap the stream before calling next. Headers are reached
-through CallInfo (connect.ClientInfoForContext / connect.ServerInfoForContext).
-Use the slog logging interceptor from the v2 announcement as the example. -->
+through CallInfo (connect.CallInfoForClientContext /
+connect.CallInfoForServerContext). Use the slog logging interceptor from the
+v2 announcement as the example. -->
 
 On this page you'll learn how to build unary interceptors &mdash; more complex use
 cases are covered in the [streaming documentation](/docs/go/streaming/).
@@ -111,7 +116,7 @@ directly to the constructors:
         NewAuthInterceptor(),
     )
 
-Interceptors fire in argument order; the first wraps the outermost call. -->
+Interceptors fire in argument order. The first wraps the outermost call. -->
 
 ```go
 // For handlers:

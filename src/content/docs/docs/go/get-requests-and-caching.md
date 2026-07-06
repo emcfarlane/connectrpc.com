@@ -38,16 +38,15 @@ It is still necessary to opt-in to HTTP GET on your client, as well. If you are
 using a Go client, you would specify the `WithHTTPGet` option when creating the
 Connect client.
 
-<!-- TODO(v2): connect.WithHTTPGet is replaced by the transport option
-connecthttp.WithGET(maxURLBytes int), which enables GET for idempotent unary
-RPCs and falls back to POST when the encoded URL would exceed maxURLBytes
-(there is no separate WithHTTPGetMaxURLSize):
+<!-- TODO(v2): connect.WithHTTPGet moves verbatim to the transport option
+connecthttp.WithHTTPGet(), and connecthttp.WithHTTPGetMaxURLSize(bytes,
+fallback) still configures the URL size limit and POST fallback:
 
     client := connect.NewClient(
         connecthttp.NewTransport(
             http.DefaultClient,
             "http://localhost:8080",
-            connecthttp.WithGET(8192),
+            connecthttp.WithHTTPGet(),
         ),
     )
     greetClient := greetv1connect.NewGreetServiceClient(client)
@@ -83,7 +82,8 @@ For example, you may wish to set the `Cache-Control` header with a `max-age`
 directive:
 
 <!-- TODO(v2): connect.CallInfoForHandlerContext(ctx) (info, ok) becomes
-connect.ServerInfoForContext(ctx), returning *CallInfo directly. -->
+connect.CallInfoForServerContext(ctx), returning *CallInfo directly (nil
+outside a handler). -->
 
 ```go
 callInfo, ok := connect.CallInfoForHandlerContext(ctx)

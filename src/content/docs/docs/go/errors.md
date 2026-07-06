@@ -20,8 +20,8 @@ behavior change, not just a rename:
 - Attach an underlying error with (*Error).WithCause(err). The cause is
   available to errors.Is/errors.As locally but is never serialized.
 - Errors received from a client call are marked remote ((*Error).IsRemote()).
-  Returning a remote error from a handler is rewritten to a bare CodeInternal;
-  handlers must translate downstream errors into explicit local errors. -->
+  Returning a remote error from a handler is rewritten to a bare CodeInternal.
+  Handlers must translate downstream errors into explicit local errors. -->
 
 At their simplest, `connect-go` errors attach an [error
 code](/docs/protocol/#error-codes) to a standard Go error. The error code and
@@ -98,7 +98,7 @@ built with Connect.
   detail may be a proto.Message (wrapped in Any at encode time) or an
   *anypb.Any.
 - (*Error).Details() returns []any. The concrete detail types are
-  transport-defined; for connecthttp's Connect/gRPC/gRPC-Web protocols,
+  transport-defined. For connecthttp's Connect/gRPC/gRPC-Web protocols,
   received details are *anypb.Any values, so the client example must unmarshal
   with anypb.UnmarshalNew (or check TypeUrl) instead of detail.Value(). -->
 

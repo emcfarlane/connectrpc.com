@@ -164,7 +164,8 @@ interfaces and constructors. Feel free to poke around if you're interested
 
 <!-- TODO(v2): Rewrite the server example for the v2 API:
 - Imports become connectrpc.com/connect/v2, connectrpc.com/connect/v2/connecthttp,
-  and connectrpc.com/validate/v2.
+  and connectrpc.com/validate/v2 (verify the validate v2 module path and
+  constructor once published).
 - Construction becomes:
     server := connect.NewServer(validate.NewServerInterceptor())
     greetv1connect.RegisterGreetServiceHandler(server, greeter)
@@ -372,12 +373,12 @@ Congratulations &mdash; you've built your first Connect service! 🎉
   `connect-go` servers to interop with `grpc-web` frontends without the need
   for an intermediary proxy (such as Envoy).
 
-<!-- TODO(v2): WithGRPC/WithGRPCWeb are replaced by the connecthttp.WithProtocol
-transport option:
+<!-- TODO(v2): WithGRPC/WithGRPCWeb keep their names but become connecthttp
+transport options:
     transport := connecthttp.NewTransport(
         http.DefaultClient,
         "http://localhost:8080",
-        connecthttp.WithProtocol(connect.ProtocolNameGRPC),
+        connecthttp.WithGRPC(),
     )
   Update the prose and example below accordingly. -->
 

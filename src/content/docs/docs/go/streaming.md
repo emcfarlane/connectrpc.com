@@ -48,9 +48,11 @@ service GreetService {
 ```
 
 <!-- TODO(v2): The generic stream types are gone. The generator now emits
-per-RPC typed wrappers (e.g. GreetGreetHandlerStream, GreetGreetClientStream)
-over the connect.ServerStream and connect.ClientStream interfaces. Update the
-type names in all three "Streaming variants" paragraphs below. -->
+per-RPC typed wrappers named <Service><Method>ClientStream and
+<Service><Method>ServerStream (e.g. GreetServiceGreetClientStream for callers,
+GreetServiceGreetServerStream for handlers) over the connect.ClientStream and
+connect.ServerStream interfaces. Update the type names in all three
+"Streaming variants" paragraphs below. -->
 
 In Go, client streaming RPCs use the `ClientStream` and `ClientStreamForClient`
 types.
@@ -161,10 +163,10 @@ handler implementation in `cmd/server/main.go`:
 
 <!-- TODO(v2): Rewrite the handler example below for the v2 API:
 - Signature becomes Greet(ctx context.Context, stream
-  greetv1connect.GreetGreetHandlerStream) (*greetv1.GreetResponse, error).
+  greetv1connect.GreetServiceGreetServerStream) (*greetv1.GreetResponse, error).
 - The receive loop becomes:
     for {
-        req, err := stream.Receive(ctx)
+        req, err := stream.Receive()
         if errors.Is(err, io.EOF) {
             break
         }
@@ -175,7 +177,7 @@ handler implementation in `cmd/server/main.go`:
     }
   There is no Receive() bool / Msg() / Err() pattern.
 - connect.CallInfoForHandlerContext(ctx) becomes
-  connect.ServerInfoForContext(ctx) (returns *CallInfo, no ok bool).
+  connect.CallInfoForServerContext(ctx) (returns *CallInfo, no ok bool).
 - connect.NewError now takes a string message: use connect.NewError(code, msg)
   or connect.Errorf(code, format, args...). Wrap an underlying error with
   .WithCause(err) — the cause is local-only and not sent on the wire.
@@ -255,8 +257,8 @@ interceptor from the interceptors page already handles streaming RPCs because
 interceptors wrap every RPC as a stream — there is no separate WrapUnary /
 WrapStreamingClient / WrapStreamingHandler surface. Either drop this section or
 show the same connect.ClientInterceptor / connect.ServerInterceptor functions
-reading and setting headers via connect.ClientInfoForContext /
-connect.ServerInfoForContext. Interceptors are passed to connect.NewClient /
+reading and setting headers via connect.CallInfoForClientContext /
+connect.CallInfoForServerContext. Interceptors are passed to connect.NewClient /
 connect.NewServer instead of connect.WithInterceptors. -->
 
 Now that we've implemented our new client streaming RPC, we'll also need to

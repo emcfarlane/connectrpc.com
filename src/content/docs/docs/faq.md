@@ -220,9 +220,9 @@ encourage you to set `ReadHeaderTimeout` in particular.
 On reading the response, a client can call `Close` on the stream to
 gracefully close the connection. This will discard any remaining messages
 sent from the server until the final status message is received. If the
-status is an error, `Close` will return the wire error. On bidirectional and
-client streams, call `CloseSend` first to signal that you're done sending
-messages.
+status is an error, `Close` will return the wire error. On bidirectional
+streams, call `CloseSend` first to signal that you're done sending messages.
+Client streams close the send side with `CloseAndReceive`.
 Alternatively, if you wish to cancel the operation and immediately stop
 the client stream, see [below](#cancel-stream) to cancel the operation.
 
@@ -280,7 +280,7 @@ func grpcOnlyMiddleware(next http.Handler) http.Handler {
 ### How do I customize serialization errors returned by the Connect server?
 
 You can customize the error message by providing a different `Codec` with
-`connecthttp.WithCodecs`. Code and details can't be customized.
+`connecthttp.WithCodec`. Code and details can't be customized.
 
 ### How do I use custom JSON options like `EmitUnpopulated` in Connect-Go?
 
@@ -294,13 +294,13 @@ codec := connectproto.NewJSONCodec()
 codec.MarshalOptions.EmitUnpopulated = true
 
 // Servers:
-connecthttp.Mount(mux, server, connecthttp.WithCodecs(codec))
+connecthttp.Mount(mux, server, connecthttp.WithCodec(codec))
 
 // Clients:
 transport := connecthttp.NewTransport(
 	httpClient,
 	baseURL,
-	connecthttp.WithCodecs(codec),
+	connecthttp.WithCodec(codec),
 )
 ```
 

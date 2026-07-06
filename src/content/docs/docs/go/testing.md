@@ -31,10 +31,9 @@ error handling — without binding a port, use the in-process transport from
 
 Cover:
 - Why in-process beats httptest.Server/loopback listeners (speed, no flaky
-  port management); when you still want a real HTTP round-trip.
-- Message copying semantics: connectinprocess.WithCopyFunc and
-  connectinprocess.ProtoCopy for full proto deep copies versus the default
-  shallow copy.
+  port management), and when you still want a real HTTP round-trip.
+- Message copying semantics: the default is connectinprocess.ProtoCopy, a
+  safe proto deep copy. connectinprocess.WithCopyFunc overrides it.
 - Streaming RPCs over the in-process transport.
 - Production uses: delegating calls between services in the same process. -->
 

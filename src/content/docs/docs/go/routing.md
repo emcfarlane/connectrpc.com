@@ -37,7 +37,7 @@ implements Handle(pattern string, handler http.Handler):
     api := http.NewServeMux()
     connecthttp.Mount(api, server)
 
-The StripPrefix pattern below should still apply; verify it against the v2
+The StripPrefix pattern below should still apply. Verify it against the v2
 connecthttp handler before publishing. -->
 
 ```go mark={6}

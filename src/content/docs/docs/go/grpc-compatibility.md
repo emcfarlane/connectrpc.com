@@ -33,9 +33,8 @@ traditional HTTP checks, use `connectrpc.com/grpchealth`.
 
 ## Clients
 
-<!-- TODO(v2): WithGRPC/WithGRPCWeb are replaced by the transport option
-connecthttp.WithProtocol(connect.ProtocolNameGRPC) or
-connecthttp.WithProtocol(connect.ProtocolNameGRPCWeb), passed to
+<!-- TODO(v2): WithGRPC/WithGRPCWeb keep their names but become transport
+options — connecthttp.WithGRPC() or connecthttp.WithGRPCWeb(), passed to
 connecthttp.NewTransport. -->
 
 Clients default to using the Connect protocol. To use the gRPC or gRPC-Web
@@ -57,12 +56,12 @@ schema will also work without modification.
 <!-- TODO(v2): Rewrite the migration steps below for v2. The v1 instructions
 about connect.Request/connect.Response wrappers no longer apply — v2 handlers
 and clients use plain Protobuf messages, and metadata IS context-based
-(connect.ServerInfoForContext / connect.NewClientContext), which is actually
-closer to grpc-go's model. Also: connect.NewError now takes a string message,
-server setup is connect.NewServer + RegisterXHandler + connecthttp.Mount, and
-clients use connecthttp.NewTransport with
-connecthttp.WithProtocol(connect.ProtocolNameGRPC). Mention that grpcreflect
-and grpchealth ship v2-compatible modules. -->
+(connect.CallInfoForServerContext / connect.NewClientContext), which is
+actually closer to grpc-go's model. Also: connect.NewError now takes a string
+message, server setup is connect.NewServer + RegisterXHandler +
+connecthttp.Mount, and clients use connecthttp.NewTransport with
+connecthttp.WithGRPC(). Mention that grpcreflect and grpchealth ship
+v2-compatible modules (verify they're published before release). -->
 
 The particulars of your codebase will be unique, but most migrations include a
 few common steps:

@@ -8,14 +8,14 @@ link to this page in the error message.
 
 <!-- TODO(v2): Both fixes on this page construct clients with the v1 API.
 Update to v2: clients are built with connect.NewClient over
-connecthttp.NewTransport, and WithGRPC becomes
-connecthttp.WithProtocol(connect.ProtocolNameGRPC):
+connecthttp.NewTransport, and connect.WithGRPC becomes the transport option
+connecthttp.WithGRPC():
 
     client := connect.NewClient(
         connecthttp.NewTransport(
             httpClient, // h2c-enabled where needed
             "http://localhost:8080",
-            connecthttp.WithProtocol(connect.ProtocolNameGRPC),
+            connecthttp.WithGRPC(),
         ),
     )
     greetClient := greetv1connect.NewGreetServiceClient(client)

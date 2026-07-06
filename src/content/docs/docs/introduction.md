@@ -11,14 +11,10 @@ type-safe client in any supported language.
 
 ## Production-grade simplicity
 
-<!-- TODO(v2): connect-go v2 is a small set of packages (core plus connecthttp,
-connectproto, connectgzip, connectinprocess), with the core API in a single
-connect.go file. Tweak the "just one package" claim below to stay accurate. -->
-
 Each Connect implementation is _focused_: just the essential features,
 built on top of time-tested HTTP libraries and designed to get out of your way.
-In Go, Connect is just [one package][connect-go] &mdash; short enough to read
-in an afternoon.
+In Go, the `connect` package that defines Connect's core types is just
+[one file][connect-go] &mdash; short enough to read in an afternoon.
 
 Connect is our vision of production-grade RPC. It's simple, reliable, and
 unobtrusive, because nobody has time to debug overcomplicated networking or

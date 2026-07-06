@@ -163,29 +163,22 @@ underlying implementation allows us to do so.
 
 ## Go
 
-### Why use generics?
+### Why did Connect-Go v2 remove the generic request and response types?
 
-<!-- TODO(v2): This answer is v1-specific. connect-go v2 removed the generic
-Request/Response wrappers and the generic stream types: unary RPCs use plain
-Protobuf messages, streaming RPCs use generated per-RPC typed wrappers, and
-metadata moved to context via CallInfo. Rewrite as a "Why did v2 drop
-generics?" answer (signature noise, unfamiliar pattern, metadata rarely used —
-see the v2 announcement) or remove the section. -->
+Connect-Go v1 wrapped every unary message in generic `connect.Request` and
+`connect.Response` types. The wrappers made headers and trailers explicit
+&mdash; metadata flowed through arguments and return values instead of the
+context &mdash; but they added noise to every method signature for a feature
+that most handlers never used, and the pattern was unfamiliar to many Go
+developers.
 
-Generic code is inherently more complex than non-generic code. Still, introducing
-generics to Connect-Go eliminated two significant sources of complexity:
-
-- Generics let us generate less code, especially for streaming RPCs &mdash; if
-  you're willing to write out some long URLs, it's now just as easy to use
-  Connect without `protoc-gen-connect-go`. The generic stream types, like
-  `BidirectionalStream`, are much clearer than the equivalent code generation
-  templates.
-- We don't need to attach any values to the context, because Connect's generic
-  `Request` and `Response` structs can carry headers and trailers explicitly.
-  This makes data flow obvious and avoids any confusion about inbound and
-  outbound metadata.
-
-On balance, we find Connect-Go simpler with generics.
+Connect-Go v1.19 introduced the `simple` generation flag, which removed the
+wrappers and moved metadata access to the context. In v2, this style is the
+default and only option: unary RPCs use plain Protobuf messages, streaming
+RPCs use small generated per-RPC stream types, and headers and trailers are
+reached through a `CallInfo` in the context. See the
+[headers & trailers documentation](/docs/go/headers-and-trailers/) for
+details.
 
 ### Why generate Connect-specific packages?
 
@@ -224,11 +217,12 @@ encourage you to set `ReadHeaderTimeout` in particular.
 
 ### How do I close a client response stream in Connect-Go?
 
-On reading the response, a client can call `CloseResponse` on bidirectional
-streams or `Close` on server streams to gracefully close the connection.
-This will discard any remaining messages sent from the server until the
-final status message is received. If the status is an error, the close function
-will return the wire error.
+On reading the response, a client can call `Close` on the stream to
+gracefully close the connection. This will discard any remaining messages
+sent from the server until the final status message is received. If the
+status is an error, `Close` will return the wire error. On bidirectional and
+client streams, call `CloseSend` first to signal that you're done sending
+messages.
 Alternatively, if you wish to cancel the operation and immediately stop
 the client stream, see [below](#cancel-stream) to cancel the operation.
 
@@ -259,7 +253,7 @@ import { ElizaService } from "@buf/connectrpc_eliza.bufbuild_es/connectrpc/eliza
 
 ### Does Connect-Go provide the equivalent of gRPC's `WithBlock` option when connecting to servers?
 
-No, because under the hood Connect-Go is just using an `*http.Client`, but we are evaluating potentially
+No, because under the hood Connect-Go's HTTP transport is just using an `*http.Client`, but we are evaluating potentially
 adding similar functionality to Connect-Go. In the meantime, you can take a look at [github.com/bufbuild/httplb][httplb].
 It's an `*http.Client` that's not specific to Connect, but solves a lot of the gotchas with using the stdlib
 client/transport for RPC, especially if you're using k8s. Keep in mind that it's still in Alpha so the APIs are
@@ -285,19 +279,33 @@ func grpcOnlyMiddleware(next http.Handler) http.Handler {
 
 ### How do I customize serialization errors returned by the Connect server?
 
-You can customize the error message by providing a different `Codec`. Code
-and details can't be customized.
+You can customize the error message by providing a different `Codec` with
+`connecthttp.WithCodecs`. Code and details can't be customized.
 
 ### How do I use custom JSON options like `EmitUnpopulated` in Connect-Go?
 
-<!-- TODO(v2): Re-answer for v2. The built-in codecs now live in
-connectrpc.com/connect/v2/connectproto; custom marshaling options are handled
-by implementing connect.Codec (wrapping protojson with the desired options)
-and registering it with connecthttp.WithCodecs. The third-party
-akshayjshah/connectproto link is v1-only. -->
+The JSON codec in `connectrpc.com/connect/v2/connectproto` exposes the
+underlying [protojson](https://pkg.go.dev/google.golang.org/protobuf/encoding/protojson)
+options as exported fields. Configure them before use, then register the codec
+on your server or client transport:
 
-You can use these options by customizing the codec. https://github.com/akshayjshah/connectproto is a handy project that
-makes this easier.
+```go
+codec := connectproto.NewJSONCodec()
+codec.MarshalOptions.EmitUnpopulated = true
+
+// Servers:
+connecthttp.Mount(mux, server, connecthttp.WithCodecs(codec))
+
+// Clients:
+transport := connecthttp.NewTransport(
+	httpClient,
+	baseURL,
+	connecthttp.WithCodecs(codec),
+)
+```
+
+The binary Protobuf codec, `connectproto.NewBinaryCodec`, exposes its
+`proto.MarshalOptions` and `proto.UnmarshalOptions` the same way.
 
 ### Should graceful shutdown of streaming endpoints be manually handled in Connect-go?
 

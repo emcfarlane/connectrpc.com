@@ -47,15 +47,11 @@ service GreetService {
 }
 ```
 
-<!-- TODO(v2): The generic stream types are gone. The generator now emits
-per-RPC typed wrappers named <Service><Method>ClientStream and
-<Service><Method>ServerStream (e.g. GreetServiceGreetClientStream for callers,
-GreetServiceGreetServerStream for handlers) over the connect.ClientStream and
-connect.ServerStream interfaces. Update the type names in all three
-"Streaming variants" paragraphs below. -->
-
-In Go, client streaming RPCs use the `ClientStream` and `ClientStreamForClient`
-types.
+In Go, the generator emits a pair of stream types for each streaming RPC,
+named after the service and method: `GreetServiceGreetServerStream` for the
+handler and `GreetServiceGreetClientStream` for the client. Each type exposes
+only the operations its streaming variant allows. For client streaming, the
+handler stream can only receive and the client stream can only send.
 
 In _server streaming_, the client sends a single message and the server
 responds with multiple messages. In Protobuf schemas, server streaming methods
@@ -67,8 +63,8 @@ service GreetService {
 }
 ```
 
-In Go, server streaming RPCs use the `ServerStream` and `ServerStreamForClient`
-types.
+In Go, server streaming RPCs use the same generated stream types, exposing
+`Send` to the handler and `Receive` to the client.
 
 In _bidirectional streaming_ (often called bidi), the client and server may
 both send multiple messages. Often, the exchange is structured like a
@@ -85,8 +81,8 @@ service GreetService {
 }
 ```
 
-In Go, bidi streaming RPCs use the `BidiStream` and `BidiStreamForClient`
-types.
+In Go, bidi streaming RPCs also use the generated stream types, exposing
+`Send` and `Receive` on both sides.
 
 ## HTTP representation
 
@@ -119,16 +115,11 @@ a `CallInfo` type in context.
 
 ## Interceptors
 
-<!-- TODO(v2): Rewrite this section. v2 unifies unary and streaming
-interceptors: a connect.ClientInterceptor or connect.ServerInterceptor wraps
-every RPC as a stream, so there is no separate streaming interceptor surface.
-The Interceptor interface, UnaryInterceptorFunc, StreamingClientConn, and
-StreamingHandlerConn no longer exist. -->
-
-Streaming interceptors are naturally more complex than unary interceptors.
-Rather than using `UnaryInterceptorFunc`, streaming interceptors must implement
-the full `Interceptor` interface. This may require implementing a
-`StreamingClientConn` or `StreamingHandlerConn` wrapper.
+[Interceptors](/docs/go/interceptors/) work the same way for streaming and
+unary RPCs: every RPC is wrapped as a stream by a `connect.ClientInterceptor`
+or `connect.ServerInterceptor`. Interceptors that need to observe individual
+messages can wrap the `connect.ClientStream` or `connect.ServerStream` before
+passing it along.
 
 ## An example
 
@@ -161,29 +152,6 @@ service GreetService {
 After running `buf generate` to update our generated code, we can amend our
 handler implementation in `cmd/server/main.go`:
 
-<!-- TODO(v2): Rewrite the handler example below for the v2 API:
-- Signature becomes Greet(ctx context.Context, stream
-  greetv1connect.GreetServiceGreetServerStream) (*greetv1.GreetResponse, error).
-- The receive loop becomes:
-    for {
-        req, err := stream.Receive()
-        if errors.Is(err, io.EOF) {
-            break
-        }
-        if err != nil {
-            return nil, err
-        }
-        ...
-    }
-  There is no Receive() bool / Msg() / Err() pattern.
-- connect.CallInfoForHandlerContext(ctx) becomes
-  connect.CallInfoForServerContext(ctx) (returns *CallInfo, no ok bool).
-- connect.NewError now takes a string message: use connect.NewError(code, msg)
-  or connect.Errorf(code, format, args...). Wrap an underlying error with
-  .WithCause(err) — the cause is local-only and not sent on the wire.
-- main() changes to connect.NewServer + RegisterGreetServiceHandler +
-  connecthttp.Mount as in Getting Started. -->
-
 ```go
 package main
 
@@ -191,12 +159,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
 
-	"connectrpc.com/connect"
-	"connectrpc.com/validate"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
+	"connectrpc.com/validate/v2"
 
 	greetv1 "example/gen/greet/v1"
 	"example/gen/greet/v1/greetv1connect"
@@ -206,22 +176,23 @@ type GreetServer struct{}
 
 func (s *GreetServer) Greet(
 	ctx context.Context,
-	stream *connect.ClientStream[greetv1.GreetRequest],
+	stream greetv1connect.GreetServiceGreetServerStream,
 ) (*greetv1.GreetResponse, error) {
-	callInfo, ok := connect.CallInfoForHandlerContext(ctx)
-	if !ok {
-		return nil, errors.New("can't access headers: no CallInfo for handler context")
-	}
+	callInfo := connect.CallInfoForServerContext(ctx)
 	log.Println("Request headers: ", callInfo.RequestHeader())
 	var greeting strings.Builder
-	for stream.Receive() {
-		g := fmt.Sprintf("Hello, %s!\n", stream.Msg().Name)
-		if _, err := greeting.WriteString(g); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, err)
+	for {
+		req, err := stream.Receive()
+		if errors.Is(err, io.EOF) {
+			break
 		}
-	}
-	if err := stream.Err(); err != nil {
-		return nil, connect.NewError(connect.CodeUnknown, err)
+		if err != nil {
+			return nil, err
+		}
+		g := fmt.Sprintf("Hello, %s!\n", req.Name)
+		if _, err := greeting.WriteString(g); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, "failed to build greeting").WithCause(err)
+		}
 	}
 	callInfo.ResponseHeader().Set("Greet-Version", "v1")
 	res := &greetv1.GreetResponse{
@@ -232,13 +203,13 @@ func (s *GreetServer) Greet(
 
 func main() {
 	greeter := &GreetServer{}
-	mux := http.NewServeMux()
-	path, handler := greetv1connect.NewGreetServiceHandler(
-		greeter,
+	server := connect.NewServer(
 		// Validation via Protovalidate is almost always recommended
-		connect.WithInterceptors(validate.NewInterceptor()),
+		validate.NewServerInterceptor(),
 	)
-	mux.Handle(path, handler)
+	greetv1connect.RegisterGreetServiceHandler(server, greeter)
+	mux := http.NewServeMux()
+	connecthttp.Mount(mux, server)
 	p := new(http.Protocols)
 	p.SetHTTP1(true)
 	// Use h2c so we can serve HTTP/2 without TLS.
@@ -252,69 +223,7 @@ func main() {
 }
 ```
 
-<!-- TODO(v2): Rewrite the interceptor example below. In v2 the auth
-interceptor from the interceptors page already handles streaming RPCs because
-interceptors wrap every RPC as a stream — there is no separate WrapUnary /
-WrapStreamingClient / WrapStreamingHandler surface. Either drop this section or
-show the same connect.ClientInterceptor / connect.ServerInterceptor functions
-reading and setting headers via connect.CallInfoForClientContext /
-connect.CallInfoForServerContext. Interceptors are passed to connect.NewClient /
-connect.NewServer instead of connect.WithInterceptors. -->
-
-Now that we've implemented our new client streaming RPC, we'll also need to
-update our [simple authentication interceptor](/docs/go/interceptors/). To support
-streaming, we must implement the full `Interceptor` interface:
-
-```go
-const tokenHeader = "Acme-Token"
-
-var errNoToken = errors.New("no token provided")
-
-type authInterceptor struct{}
-
-func NewAuthInterceptor() *authInterceptor {
-	return &authInterceptor{}
-}
-
-func (i *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	// Same as previous UnaryInterceptorFunc.
-	return func(
-		ctx context.Context,
-		req connect.AnyRequest,
-	) (connect.AnyResponse, error) {
-		if req.Spec().IsClient {
-			// Send a token with client requests.
-			req.Header().Set(tokenHeader, "sample")
-		} else if req.Header().Get(tokenHeader) == "" {
-			// Check token in handlers.
-			return nil, connect.NewError(connect.CodeUnauthenticated, errNoToken)
-		}
-		return next(ctx, req)
-	}
-}
-
-func (*authInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
-	return func(
-		ctx context.Context,
-		spec connect.Spec,
-	) connect.StreamingClientConn {
-		conn := next(ctx, spec)
-		conn.RequestHeader().Set(tokenHeader, "sample")
-		return conn
-	}
-}
-
-func (i *authInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return func(
-		ctx context.Context,
-		conn connect.StreamingHandlerConn,
-	) error {
-		if conn.RequestHeader().Get(tokenHeader) == "" {
-			return connect.NewError(connect.CodeUnauthenticated, errNoToken)
-		}
-		return next(ctx, conn)
-	}
-}
-```
-
-We apply our interceptor just as we did before, using `WithInterceptors`.
+Our [simple authentication interceptor](/docs/go/interceptors/) needs no
+changes to support the new client streaming RPC. The same interceptors run
+for every RPC, and we apply them just as we did before, passing them to
+`connect.NewClient` and `connect.NewServer`.

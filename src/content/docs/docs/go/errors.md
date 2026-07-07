@@ -10,30 +10,24 @@ the Connect protocol.
 
 ## Working with errors
 
-<!-- TODO(v2): Rewrite this section for the new error semantics. This is a real
-behavior change, not just a rename:
-- connect.NewError now takes a string message: NewError(code Code, message
-  string). connect.Errorf(code, format, args...) is the printf variant.
-- Only the explicit message is serialized to the wire. A bare error returned
-  from a handler becomes CodeUnknown with NO wire message — v1's behavior of
-  sending err.Error() verbatim is gone. Call out the privacy flip.
-- Attach an underlying error with (*Error).WithCause(err). The cause is
-  available to errors.Is/errors.As locally but is never serialized.
-- Errors received from a client call are marked remote ((*Error).IsRemote()).
-  Returning a remote error from a handler is rewritten to a bare CodeInternal.
-  Handlers must translate downstream errors into explicit local errors. -->
-
 At their simplest, `connect-go` errors attach an [error
-code](/docs/protocol/#error-codes) to a standard Go error. The error code and
-the underlying error's `Error()` string are sent over the network to the
-client, which may handle different codes with different retry or fallback
-logic. If you're familiar with gRPC status codes, Connect's error codes use the
-same names and have the same semantics.
+code](/docs/protocol/#error-codes) and a message to a standard Go error. The
+error code and the message are sent over the network to the client, which may
+handle different codes with different retry or fallback logic. If you're
+familiar with gRPC status codes, Connect's error codes use the same names and
+have the same semantics.
 
-Connect handlers attach status codes to errors using the `NewError` function.
-Handlers should return coded errors; if they don't, Connect will use the
+Connect handlers create errors with the `NewError` and `Errorf` functions,
+which take the code and a message. Only the explicit message is serialized to
+the wire, so text sent to callers is always written on purpose. To keep an
+underlying error for local inspection and logging, attach it as a cause with
+`WithCause`. Causes are visible to `errors.Is` and `errors.As` on the server
+but are never serialized.
+
+Handlers should return coded errors. If they don't, Connect will use the
 `deadline_exceeded` code for `context.DeadlineExceeded`, `canceled` for
-`context.Canceled`, and `unknown` for all other errors. For example:
+`context.Canceled`, and `unknown` for all other errors, without serializing
+the error's text. For example:
 
 ```go
 func (s *GreetServer) Greet(
@@ -44,11 +38,11 @@ func (s *GreetServer) Greet(
 		return nil, err // automatically coded correctly
 	}
 	if err := validateGreetRequest(req); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		return nil, connect.Errorf(connect.CodeInvalidArgument, "invalid greeting: %v", err)
 	}
 	greeting, err := doGreetWork(ctx, req)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeUnknown, err)
+		return nil, connect.NewError(connect.CodeUnknown, "failed to greet").WithCause(err)
 	}
 	return &greetv1.GreetResponse{
 		Greeting: greeting,
@@ -60,16 +54,11 @@ Regardless of the protocol in use, Connect clients automatically unmarshal
 response data into a standard Go error. Use Connect's `CodeOf` function and the
 standard library's `errors.As` to inspect errors:
 
-<!-- TODO(v2): Update the client example below: construct the client with
-connect.NewClient(connecthttp.NewTransport(http.DefaultClient,
-"http://localhost:8080")) and pass it to greetv1connect.NewGreetServiceClient.
-Mention (*Error).IsRemote() for distinguishing the peer's verdict from local
-errors (replaces v1 IsWireError). -->
-
 ```go
 client := greetv1connect.NewGreetServiceClient(
-	http.DefaultClient,
-	"http://localhost:8080",
+	connect.NewClient(
+		connecthttp.NewTransport(http.DefaultClient, "http://localhost:8080"),
+	),
 )
 _, err := client.Greet(
 	context.Background(),
@@ -89,56 +78,49 @@ if err != nil {
 These APIs work for all three supported protocols, even if the server isn't
 built with Connect.
 
-## Error Details
+Errors received from an RPC are marked remote. `IsRemote` distinguishes the
+server's verdict from errors created locally, replacing v1's `IsWireError`.
+A handler that returns a remote error unchanged sends the client a bare
+`internal` code, so translate downstream failures into explicit local errors.
 
-<!-- TODO(v2): Rewrite this section for the v2 details API:
-- The ErrorDetail wrapper type, NewErrorDetail, and AddDetail are gone.
-- Servers attach details with (*Error).WithDetail(detail any), which returns a
-  cloned error: err = err.WithDetail(retryInfo). For connecthttp protocols, a
-  detail may be a proto.Message (wrapped in Any at encode time) or an
-  *anypb.Any.
-- (*Error).Details() returns []any. The concrete detail types are
-  transport-defined. For connecthttp's Connect/gRPC/gRPC-Web protocols,
-  received details are *anypb.Any values, so the client example must unmarshal
-  with anypb.UnmarshalNew (or check TypeUrl) instead of detail.Value(). -->
+## Error Details
 
 Like `grpc-go`, `connect-go` allows servers to enrich errors with more than
 just a code and a string. Since Connect focuses on schema-first APIs, this
 additional data &mdash; called error details &mdash; is a slice of Protobuf
-messages wrapped in the `ErrorDetail` type. Details are commonly used to send
+messages. Details are commonly used to send
 backoff parameters for transient failures, localized error messages, or other
 structured data. The `google.golang.org/genproto/googleapis/rpc/errdetails`
 package contains a variety of Protobuf messages often used as error details.
-Regardless of the RPC protocol in use, servers can add details to any `*Error`:
+Regardless of the RPC protocol in use, servers can add details to any `*Error`
+with `WithDetail`:
 
 ```go
 package example
 
 import (
-	"errors"
+	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func newTransientError() error {
-	err := connect.NewError(
-		connect.CodeUnavailable,
-		errors.New("overloaded: back off and retry"),
-	)
 	retryInfo := &errdetails.RetryInfo{
 		RetryDelay: durationpb.New(10 * time.Second),
 	}
-	if detail, detailErr := connect.NewErrorDetail(retryInfo); detailErr == nil {
-		err.AddDetail(detail)
-	}
-	return err
+	return connect.NewError(
+		connect.CodeUnavailable,
+		"overloaded: back off and retry",
+	).WithDetail(retryInfo)
 }
 ```
 
-Clients receive error details as a slice of `*ErrorDetail`, which they must
-inspect to find any details of interest:
+`WithDetail` returns a cloned error and never fails. Packing the detail into
+an `anypb.Any` happens when the error is serialized. Clients receive error
+details as `*anypb.Any` values, which they must unmarshal to find any details
+of interest:
 
 ```go
 package example
@@ -146,9 +128,10 @@ package example
 import (
 	"errors"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func extractRetryInfo(err error) (*errdetails.RetryInfo, bool) {
@@ -157,7 +140,11 @@ func extractRetryInfo(err error) (*errdetails.RetryInfo, bool) {
 		return nil, false
 	}
 	for _, detail := range connectErr.Details() {
-		msg, valueErr := detail.Value()
+		anyMsg, ok := detail.(*anypb.Any)
+		if !ok {
+			continue
+		}
+		msg, valueErr := anypb.UnmarshalNew(anyMsg, proto.UnmarshalOptions{})
 		if valueErr != nil {
 			// Usually, errors here mean that we don't have the schema for this
 			// Protobuf message.

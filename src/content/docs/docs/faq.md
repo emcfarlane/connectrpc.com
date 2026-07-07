@@ -217,12 +217,17 @@ encourage you to set `ReadHeaderTimeout` in particular.
 
 ### How do I close a client response stream in Connect-Go?
 
-On reading the response, a client can call `Close` on the stream to
-gracefully close the connection. This will discard any remaining messages
-sent from the server until the final status message is received. If the
-status is an error, `Close` will return the wire error. On bidirectional
-streams, call `CloseSend` first to signal that you're done sending messages.
-Client streams close the send side with `CloseAndReceive`.
+To gracefully close a client stream, read messages until the end of the
+stream. `Receive` reports clean completion with an error matching `io.EOF`,
+and returns the wire error if the server ended the stream with an error. On
+bidirectional streams, call `CloseSend` first to signal that you're done
+sending messages. Client streams close the send side and read the response
+with `CloseAndReceive`.
+
+`Close` is a cleanup, not a graceful close. Like `http.Response.Body.Close`,
+it immediately tears the stream down, unblocking any pending `Receive`
+without waiting for the final status. It's idempotent, so always close the
+stream when you're done with it, typically with `defer stream.Close()`.
 Alternatively, if you wish to cancel the operation and immediately stop
 the client stream, see [below](#cancel-stream) to cancel the operation.
 

@@ -92,7 +92,7 @@ and we gauge interest in new languages with [GitHub polls][poll-discussions].
 [connect-py]: https://github.com/connectrpc/connect-py
 [python-getting-started]: /docs/python/getting-started
 [connect-conformance]: https://github.com/connectrpc/conformance
-[connect-go]: https://github.com/connectrpc/connect-go
+[connect-go]: https://github.com/connectrpc/connect-go/blob/main/connect.go
 [connect-kotlin]: https://github.com/connectrpc/connect-kotlin
 [connect-swift]: https://github.com/connectrpc/connect-swift
 [swift-launch-blog-post]: https://buf.build/blog/announcing-connect-swift

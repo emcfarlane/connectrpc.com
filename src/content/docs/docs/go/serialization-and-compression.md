@@ -8,45 +8,37 @@ specification includes [mappings to and from JSON][protojson], any Connect API
 defined with a Protobuf schema also supports JSON. This is especially
 convenient for web browsers and ad-hoc debugging with cURL.
 
-<!-- TODO(v2): Rewrite for the v2 codec layout:
-- The built-in Protobuf binary and JSON codecs now live in
-  connectrpc.com/connect/v2/connectproto (connectproto.NewBinaryCodec(),
-  connectproto.NewJSONCodec(), both accepting WithTypeResolver and exposing
-  MarshalOptions/UnmarshalOptions as fields). connecthttp installs them by
-  default.
-- WithProtoJSON() moves verbatim to connecthttp.WithProtoJSON(), shorthand for
-  selecting the send codec on the transport: connecthttp.WithSendCodec("json").
-- WithCodec is now connecthttp.WithCodec(codec), which registers a codec by
-  its Name() on transports and servers (Mount options), replacing any default
-  with the same name.
-- The connect.Codec interface is now stream-oriented and context-aware:
-  MarshalWrite(ctx, dst io.Writer, msg) and UnmarshalRead(ctx, src io.Reader,
-  msg). StableCodec (MarshalWriteStable, IsBinary) provides the deterministic
-  encoding required for GET support. Custom codec docs need a full update. -->
-
 Connect handlers automatically accept JSON-encoded requests &mdash; there's no
 special configuration required. Connect clients default to using binary
 Protobuf. To configure your client to use JSON instead, use the
-`WithProtoJSON()` option during client construction.
+`connecthttp.WithProtoJSON()` option during transport construction.
 
 ## Replacing standard Protobuf
 
 By default, Connect uses `google.golang.org/protobuf` to serialize and
-deserialize Protobuf messages. To use a different Protobuf runtime, implement
-the `Codec` interface using the `"proto"` name. Then pass your implementation
-to your handlers and clients using the `WithCodec` option. Connect will use
+deserialize Protobuf messages. The built-in binary and JSON codecs live in the
+`connectproto` package, and `connecthttp` installs them by default. To use a
+different Protobuf runtime, implement the `Codec` interface using the
+`"proto"` name. Then pass your implementation to your transports and servers
+using the `connecthttp.WithCodec` option, which registers a codec by its
+`Name()` and replaces any default with the same name. Connect will use
 your custom codec to marshal and unmarshal a variety of unexported,
 protocol-specific messages, so take care to fall back to the standard Protobuf
 runtime if necessary.
 
 ## Custom serialization
 
-To support a completely different serialization mechanism, you'll first need to
-implement `Codec`. If your new serialization mechanism uses a schema, you'll
+To support a completely different serialization mechanism, you'll first need
+to implement `Codec`. The interface is stream-oriented and context-aware:
+`MarshalWrite` encodes a message to an `io.Writer`, and `UnmarshalRead`
+decodes one from an `io.Reader`. To support [HTTP GET
+requests](/docs/go/get-requests-and-caching/), also implement `StableCodec`,
+which adds a deterministic `MarshalWriteStable` encoding. If your new
+serialization mechanism uses a schema, you'll
 also need to write a binary to generate RPC code from the schema. Typically,
 this binary is a plugin for the appropriate compiler (for example,
-`thriftrw-go` for Thrift). This isn't as complex as it may sound! Because it
-uses Go type parameters, Connect doesn't require much generated code.
+`thriftrw-go` for Thrift). This isn't as complex as it may sound! Connect
+doesn't require much generated code.
 
 ## Compression
 
@@ -60,24 +52,20 @@ are usually larger than requests, this approach compresses most of the data on
 the network without requiring the client to make any assumptions about the
 server.
 
-<!-- TODO(v2): Update for the v2 compression layout:
-- gzip now lives in connectrpc.com/connect/v2/connectgzip
-  (connectgzip.New(), with a WithLevel option). connecthttp installs it by
-  default.
-- WithSendGzip and WithSendCompression(name) moved verbatim to connecthttp.
-- WithCompressMinBytes moved verbatim to connecthttp.WithCompressMinBytes. -->
-
 By default, Connect handlers support gzip compression using the standard
-library's `compress/gzip` at the default compression level. Connect clients
+library's `compress/gzip` at the default compression level. The gzip
+implementation lives in the `connectgzip` package, and `connecthttp` installs
+it by default. Connect clients
 default to sending uncompressed requests and asking for gzipped responses. If
 you know that the server supports gzip, you can also compress requests by using
-the `WithSendGzip` option during client construction.
+the `connecthttp.WithSendGzip` option during transport construction.
 
 Like most compression schemes, gzip _increases_ the size of very small
 messages. By default, Connect handlers (and clients using `WithSendGzip`)
 compress messages without considering their size. To only compress messages
-larger than some threshold, use `WithCompressMinBytes` during handler and
-client construction. In most cases, this improves overall performance.
+larger than some threshold, use `connecthttp.WithCompressMinBytes` during
+transport and server construction. In most cases, this improves overall
+performance.
 
 Finally, it's worth noting that clients using the Connect protocol for unary
 RPCs ask for compressed responses using the `Accept-Encoding` HTTP header. This
@@ -88,27 +76,17 @@ inspector tab automatically decompresses the data if necessary. Connect's
 
 ## Custom compression
 
-<!-- TODO(v2): Rewrite for the v2 compressor API:
-- The separate Compressor/Decompressor interfaces are consolidated into a
-  single connect.Compressor factory interface: Name(), Compress(dst io.Writer)
-  (io.WriteCloser, error), and Decompress(src io.Reader) (io.ReadCloser,
-  error). Pooling is handled internally by the implementation.
-- WithCompression is now connecthttp.WithCompressor(compressor), used for both
-  transports and servers. connecthttp.WithAcceptCompression(name) advertises
-  an already-registered algorithm by name, and connecthttp.WithNoCompression()
-  disables compression. WithSendCompression(name) keeps its name under
-  connecthttp.
-- Keep the hand-rolled example — v2.0 ships only gzip (connectgzip) and no
-  connectzstd package. -->
-
 In Go, Connect comes with gzip support because it's widely used and included in
 the standard library. To support newer compression algorithms, like Brotli or
-Zstandard, first implement the `Compressor` and `Decompressor` interfaces.
-Configure your handlers with `WithCompression`, and configure your clients with
-`WithAcceptCompression`. Where appropriate, take care to use the [IANA name for
+Zstandard, first implement the `Compressor` interface. It acts as a factory:
+`Name()` returns the registration name, `Compress` returns a writer that
+compresses to an `io.Writer`, and `Decompress` returns a reader for the
+decompressed form of an `io.Reader`.
+Configure your servers and transports with `connecthttp.WithCompressor`.
+Where appropriate, take care to use the [IANA name for
 your compression algorithm][iana-compression] (for example, `br` for Brotli and
 `zstd` for Zstandard). To have your client also send compressed requests, use
-`WithSendCompression`.
+`connecthttp.WithSendCompression`.
 
 [protojson]: https://developers.google.com/protocol-buffers/docs/proto3#json
 [iana-compression]: https://www.iana.org/assignments/http-parameters/http-parameters.xml#content-coding

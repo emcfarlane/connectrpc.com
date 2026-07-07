@@ -30,35 +30,21 @@ service GreetService {
 }
 ```
 
-Handlers will automatically support GET requests using this option, but ensure
-you have a recent enough version of Connect Go; v1.7.0 or newer is required.
-You will also need to re-run the code generation with v1.7.0 or newer.
+Handlers will automatically support GET requests using this option.
 
 It is still necessary to opt-in to HTTP GET on your client, as well. If you are
-using a Go client, you would specify the `WithHTTPGet` option when creating the
-Connect client.
-
-<!-- TODO(v2): connect.WithHTTPGet moves verbatim to the transport option
-connecthttp.WithHTTPGet(), and connecthttp.WithHTTPGetMaxURLSize(bytes,
-fallback) still configures the URL size limit and POST fallback:
-
-    client := connect.NewClient(
-        connecthttp.NewTransport(
-            http.DefaultClient,
-            "http://localhost:8080",
-            connecthttp.WithHTTPGet(),
-        ),
-    )
-    greetClient := greetv1connect.NewGreetServiceClient(client)
-
-Also mention connecthttp.NewNotModifiedError for handlers returning 304s, and
-drop the v1.7.0 version note — v2 supports GET from the start. -->
+using a Go client, you would specify the `connecthttp.WithHTTPGet` option when
+creating the transport.
 
 ```go
 client := greetv1connect.NewGreetServiceClient(
-	http.DefaultClient,
-	"http://localhost:8080",
-	connect.WithHTTPGet(),
+	connect.NewClient(
+		connecthttp.NewTransport(
+			http.DefaultClient,
+			"http://localhost:8080",
+			connecthttp.WithHTTPGet(),
+		),
+	),
 )
 ```
 
@@ -81,15 +67,9 @@ should also set the appropriate headers.
 For example, you may wish to set the `Cache-Control` header with a `max-age`
 directive:
 
-<!-- TODO(v2): connect.CallInfoForHandlerContext(ctx) (info, ok) becomes
-connect.CallInfoForServerContext(ctx), returning *CallInfo directly (nil
-outside a handler). -->
-
 ```go
-callInfo, ok := connect.CallInfoForHandlerContext(ctx)
-if ok {
-	callInfo.ResponseHeader().Set("Cache-Control", "max-age=604800")
-}
+callInfo := connect.CallInfoForServerContext(ctx)
+callInfo.ResponseHeader().Set("Cache-Control", "max-age=604800")
 ```
 
 This would instruct agents and proxies that the request may be cached for up to
@@ -100,22 +80,19 @@ would specify that the request should only be cached in private caches, such as
 the user agent itself, and *not* CDNs or reverse proxies&mdash;this would be
 appropriate, for example, for authenticated requests.
 
+Handlers can also respond to conditional requests by returning
+`connecthttp.NewNotModifiedError()`, which produces an HTTP 304 Not Modified
+for Connect GET requests.
+
 ## Distinguishing GET Requests
 
 In some cases, you might want to introduce behavior that only occurs when
-handling HTTP GET requests. This can be accomplished using the `HTTPMethod` method
-on the `CallInfo` type in context:
-
-<!-- TODO(v2): HTTPMethod is no longer on the core CallInfo — HTTP-specific
-details live on the connecthttp server info:
-
-    info := connecthttp.ServerInfoForContext(ctx)
-    if info != nil && info.HTTPMethod() == http.MethodGet { ... }
--->
+handling HTTP GET requests. This can be accomplished using the `HTTPMethod`
+method on the `connecthttp.ServerInfo` type in context:
 
 ```go
-callInfo, ok := connect.CallInfoForHandlerContext(ctx)
-if ok && callInfo.HTTPMethod() == http.MethodGet {
+callInfo := connect.CallInfoForServerContext(ctx)
+if info := connecthttp.ServerInfoForContext(ctx); info != nil && info.HTTPMethod() == http.MethodGet {
 	callInfo.ResponseHeader().Set("Cache-Control", "max-age=604800")
 }
 ```

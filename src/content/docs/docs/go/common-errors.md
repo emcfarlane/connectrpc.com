@@ -6,45 +6,32 @@ This page explains how to fix common errors when working with `connect-go`.
 Where possible, the Connect runtime recognizes these problems and includes a
 link to this page in the error message.
 
-<!-- TODO(v2): Both fixes on this page construct clients with the v1 API.
-Update to v2: clients are built with connect.NewClient over
-connecthttp.NewTransport, and connect.WithGRPC becomes the transport option
-connecthttp.WithGRPC():
-
-    client := connect.NewClient(
-        connecthttp.NewTransport(
-            httpClient, // h2c-enabled where needed
-            "http://localhost:8080",
-            connecthttp.WithGRPC(),
-        ),
-    )
-    greetClient := greetv1connect.NewGreetServiceClient(client)
-
-Also verify the quoted error strings ("possible missing connect.WithGRPC()
-client option...") against what v2 actually emits and update them. -->
-
 ## Client missing WithGRPC
 
 If you use a Connect client to call a `grpc-go` server but forget the `WithGRPC`
 option, you'll see a long error that looks like this:
 
 ```text
-unavailable: possible missing connect.WithGRPC() client option when talking to
-gRPC server, see https://connectrpc.com/docs/go/common-errors: Post
+unavailable: possible missing connecthttp.WithGRPC() client option when talking
+to gRPC server, see https://connectrpc.com/docs/go/common-errors: Post
 "http://0.0.0.0:3000/buf.ping.v1alpha1.PingService/Ping": http2: Transport:
 cannot retry err [stream error: stream ID 3; PROTOCOL_ERROR; received from
 peer] after Request.Body was written; define Request.GetBody to avoid this
 error
 ```
 
-You can fix this error by using the `WithGRPC` client option when constructing
-your client.
+You can fix this error by using the `connecthttp.WithGRPC` transport option
+when constructing your client.
 
 ```go
 client := greetv1connect.NewGreetServiceClient(
-	http.DefaultClient, // though you may also need h2c, see below
-	"http://localhost:8080",
-	connect.WithGRPC(),
+	connect.NewClient(
+		connecthttp.NewTransport(
+			http.DefaultClient, // though you may also need h2c, see below
+			"http://localhost:8080",
+			connecthttp.WithGRPC(),
+		),
+	),
 )
 ```
 
@@ -75,18 +62,22 @@ TLS. If so, make sure your HTTP client [has h2c enabled](/docs/go/deployment/#h2
 
 ```go
 client := greetv1connect.NewGreetServiceClient(
-	&http.Client{
-		Transport: &http2.Transport{
-			AllowHTTP: true,
-			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
-				// If you're also using this client for non-h2c traffic, you may want to
-				// delegate to tls.Dial if the network isn't TCP or the addr isn't in an
-				// allowlist.
-				return net.Dial(network, addr)
+	connect.NewClient(
+		connecthttp.NewTransport(
+			&http.Client{
+				Transport: &http2.Transport{
+					AllowHTTP: true,
+					DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
+						// If you're also using this client for non-h2c traffic, you may want to
+						// delegate to tls.Dial if the network isn't TCP or the addr isn't in an
+						// allowlist.
+						return net.Dial(network, addr)
+					},
+				},
 			},
-		},
-	},
-	"http://localhost:8080",
-	connect.WithGRPC(),
+			"http://localhost:8080",
+			connecthttp.WithGRPC(),
+		),
+	),
 )
 ```

@@ -19,6 +19,9 @@ without a translating proxy like Envoy. Since modern browsers all support
 binary payloads, Connect doesn't support gRPC-Web's text mode: if you're using
 `protoc-gen-grpc-web`, you must use `mode=grpcweb` when generating code.
 
+<!-- TODO(v2): Verify the grpcreflect and grpchealth v2 module paths and
+registration APIs once published. -->
+
 Many gRPC-specific tools depend on server reflection, which lets callers
 access your service's Protobuf schema at runtime. Connect supports server
 reflection with the `connectrpc.com/grpcreflect` package. Keep
@@ -33,13 +36,9 @@ traditional HTTP checks, use `connectrpc.com/grpchealth`.
 
 ## Clients
 
-<!-- TODO(v2): WithGRPC/WithGRPCWeb keep their names but become transport
-options — connecthttp.WithGRPC() or connecthttp.WithGRPCWeb(), passed to
-connecthttp.NewTransport. -->
-
 Clients default to using the Connect protocol. To use the gRPC or gRPC-Web
-protocols, use the `WithGRPC` or `WithGRPCWeb` options during client
-construction. If the gRPC server is using TLS, Connect clients work with no
+protocols, use the `connecthttp.WithGRPC` or `connecthttp.WithGRPCWeb` options
+during transport construction. If the gRPC server is using TLS, Connect clients work with no
 further configuration. If the gRPC server is using HTTP/2 without TLS,
 configure your HTTP client using `Protocols.SetUnencryptedHTTP2` as described
 in the [deployment documentation](/docs/go/deployment/#h2c).
@@ -53,46 +52,37 @@ migrations, remember that you do _not_ need to modify your service's clients:
 they can continue to use their current gRPC clients. Your current Protobuf
 schema will also work without modification.
 
-<!-- TODO(v2): Rewrite the migration steps below for v2. The v1 instructions
-about connect.Request/connect.Response wrappers no longer apply — v2 handlers
-and clients use plain Protobuf messages, and metadata IS context-based
-(connect.CallInfoForServerContext / connect.NewClientContext), which is
-actually closer to grpc-go's model. Also: connect.NewError now takes a string
-message, server setup is connect.NewServer + RegisterXHandler +
-connecthttp.Mount, and clients use connecthttp.NewTransport with
-connecthttp.WithGRPC(). Mention that grpcreflect and grpchealth ship
-v2-compatible modules (verify they're published before release). -->
-
 The particulars of your codebase will be unique, but most migrations include a
 few common steps:
 
 1. Begin generating code with `protoc-gen-connect-go`. During the migration,
    your code can import `connect-go` and `grpc-go` code without any problems.
-1. Change your service implementations to accept `connect.Request`-wrapped
-   Protobuf messages, and wrap your returned response messages using
-   `connect.NewResponse`. Rather than using context-based APIs for reading and
-   writing metadata, use the `connect.Request` and `connect.Response` types
-   directly.
+1. Change your service implementations to match the Connect handler
+   interfaces. Unary signatures use plain Protobuf messages, much like
+   `grpc-go`. Rather than `grpc-go`'s metadata APIs, read and write metadata
+   through the `CallInfo` in the context.
 1. Where necessary, change your service implementations to return Connect
    errors. Connect and gRPC use the same error codes, so this is often a
    straightforward replacement of `status.Error` with `connect.NewError`.
-1. Migrate any streaming handlers to use the Connect stream types. These are
+1. Migrate any streaming handlers to use the generated stream types. These are
    broadly similar to their `grpc-go` equivalents.
 1. Once you've migrated your service implementations to Connect, switch your
-   `main` function to use a `net/http` server instead of `grpc-go`. Remember to
+   `main` function to register the handlers on a `connect.NewServer`, mount
+   them on a `net/http` server with `connecthttp.Mount`, and stop using
+   `grpc-go`. Remember to
    [use h2c](/docs/go/deployment/#h2c) if your service's clients aren't using TLS. At
    this point, you're halfway done: your service should compile, and you could
    deploy it without migrating your calls to downstream services.
 1. Next, tackle your downstream calls. Switch to Connect's generated client
-   types, and wrap their request messages using `connect.NewRequest`. Rather
-   than using context-based APIs, set request headers directly on the request.
-   Rather than using call options, read response metadata directly from the
-   `connect.Response`. Don't forget to use `WithGRPC` when constructing your
-   client, and if necessary [configure your HTTP clients to use
+   types, constructed with `connect.NewClient` over a
+   `connecthttp.NewTransport`. Rather than using call options, read and write
+   metadata through the `CallInfo` from `connect.NewClientContext`. Don't
+   forget to use `connecthttp.WithGRPC` when constructing your transport, and
+   if necessary [configure your HTTP clients to use
    h2c](/docs/go/deployment/#h2c).
 1. Where necessary, switch from `status.Code` and `status.FromError` to
    `connect.CodeOf` and the standard library's `errors.As`.
-1. Migrate any streaming calls to the Connect stream types.
+1. Migrate any streaming calls to the generated stream types.
 1. You're done! Unless your service is in the same repository as its clients,
    you can stop generating code with `protoc-gen-go-grpc`.
 

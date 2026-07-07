@@ -6,16 +6,10 @@ After building a Connect API, you still need to deploy it to production. This
 guide covers how to configure timeouts, observability, HTTP/2 without TLS and
 CORS.
 
-<!-- TODO(v2): Light pass for v2 framing. The net/http guidance on this page
-survives, but in v2 HTTP is a pluggable transport: servers reach net/http via
-connecthttp.Mount and clients via connecthttp.NewTransport, so phrases like
-"Connect stays close to net/http" should be reframed around the connecthttp
-package. Verify the h2c examples and the Accept-Encoding note against the v2
-connecthttp implementation. -->
-
 ## Timeouts and connection pools
 
-Connect stays close to `net/http`, so you should configure your servers and
+Connect's HTTP transport, `connecthttp`, stays close to `net/http`, so you
+should configure your servers and
 clients as you normally would. (If you're not sure what all the different
 timeouts mean, [this Cloudflare blog post][cloudflare-timeouts] is a good place
 to start.) There are a few RPC-specific nuances, though:

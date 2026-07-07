@@ -2,11 +2,6 @@
 title: Migrating to v2
 ---
 
-<!-- TODO(v2): Flesh out this stub before release. Model it on
-docs/web/migrating-to-v2.mdx: a short summary of the headline changes plus a
-pointer to the MIGRATING.md guide in the connect-go repository. Draft content
-below. Verify links once v2.0 and MIGRATING.md are published. -->
-
 Version 2 of connect-go is available. The key changes are:
 
 - **Simple signatures are now the default.** The `connect.Request` and
@@ -27,14 +22,29 @@ Version 2 of connect-go is available. The key changes are:
   `CallInfo` via `connect.NewClientContext` and
   `connect.CallInfoForServerContext`.
 
-<!-- TODO(v2): Add a section on the migration tool:
+If you are using version 1, see our [migration
+guide](https://github.com/connectrpc/connect-go/blob/main/docs/v2-migration.md)
+for a complete walkthrough of every change.
 
-    go install connectrpc.com/connect/v2/cmd/connect-go-v2-migrate@latest
+## Migration tool
 
-It analyzes dependencies, code generation config, and Go sources, prompting
-with diffs for the mechanical changes. -->
+Most of the mechanical changes can be applied automatically with the
+`connect-go-v2-migrate` tool:
 
-<!-- TODO(v2): Link the authoritative migration guide once published, e.g.
-https://github.com/connectrpc/connect-go/blob/main/MIGRATING.md, and the v2
-announcement blog post. Note that v1 remains supported on a maintenance
-branch. -->
+<!-- TODO(v2): Verify the tool's install path once its module is published. -->
+
+```shellsession
+$ go install connectrpc.com/connect/v2/cmd/connect-go-v2-migrate@latest
+$ connect-go-v2-migrate -w .
+```
+
+Without `-w`, the tool is a dry run that prints diffs. It unwraps the
+`connect.Request` and `connect.Response` generics, converts `connect.NewError`
+calls while preserving the v1 wire message, updates Buf generation templates,
+and reports warnings for code that needs a manual update. When v1 generated
+code is present, it first updates the Buf templates and prints the steps to
+generate v2 bindings. Run it again after generation to rewrite Go call sites.
+
+<!-- TODO(v2): Verify the migration guide link resolves once v2 merges to
+main, and link the v2 announcement blog post. Note that v1 remains supported
+on a maintenance branch. -->

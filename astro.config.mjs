@@ -171,7 +171,6 @@ export default defineConfig({
             { label: "Interceptors", slug: "docs/go/interceptors" },
             { label: "Observability", slug: "docs/go/observability" },
             { label: "Streaming", slug: "docs/go/streaming" },
-            // TODO(v2): New page covering the connectinprocess transport.
             { label: "Testing", slug: "docs/go/testing" },
             { label: "Deployment & h2c", slug: "docs/go/deployment" },
             {
@@ -181,7 +180,6 @@ export default defineConfig({
             { label: "gRPC compatibility", slug: "docs/go/grpc-compatibility" },
             { label: "Common errors", slug: "docs/go/common-errors" },
             { label: "Godoc", slug: "docs/go/godoc" },
-            // TODO(v2): New page, mirrors docs/web/migrating-to-v2.
             { label: "Migrating to v2", slug: "docs/go/migrating-to-v2" },
           ],
         },

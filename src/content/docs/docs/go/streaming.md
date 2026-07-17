@@ -51,7 +51,53 @@ In Go, the generator emits a pair of stream types for each streaming RPC,
 named after the service and method: `GreetServiceGreetServerStream` for the
 handler and `GreetServiceGreetClientStream` for the client. Each type exposes
 only the operations its streaming variant allows. For client streaming, the
-handler stream can only receive and the client stream can only send.
+handler stream can only receive and the client stream can only send. The
+handler receives messages until `io.EOF` signals the end of the client's
+stream, then returns its single response:
+
+```go
+// Handler
+func (s *GreetServer) Greet(
+	ctx context.Context,
+	stream greetv1connect.GreetServiceGreetServerStream,
+) (*greetv1.GreetResponse, error) {
+	var names []string
+	for {
+		req, err := stream.Receive()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, req.Name)
+	}
+	return &greetv1.GreetResponse{
+		Greeting: fmt.Sprintf("Hello, %s!", strings.Join(names, ", ")),
+	}, nil
+}
+```
+
+The client sends its messages, then calls `CloseAndReceive` to close the send
+side of the stream and wait for the response:
+
+```go
+// Client
+stream, err := client.Greet(context.Background())
+if err != nil {
+	return err
+}
+for _, name := range []string{"Jane", "Joe"} {
+	if err := stream.Send(&greetv1.GreetRequest{Name: name}); err != nil {
+		return err
+	}
+}
+res, err := stream.CloseAndReceive()
+if err != nil {
+	return err
+}
+fmt.Println(res.Greeting)
+```
 
 In _server streaming_, the client sends a single message and the server
 responds with multiple messages. In Protobuf schemas, server streaming methods
@@ -64,7 +110,51 @@ service GreetService {
 ```
 
 In Go, server streaming RPCs use the same generated stream types, exposing
-`Send` to the handler and `Receive` to the client.
+`Send` to the handler and `Receive` to the client. The handler takes the
+request message and the stream; returning ends the RPC, with `nil` for
+success or an error to send the client:
+
+```go
+// Handler
+func (s *GreetServer) Greet(
+	ctx context.Context,
+	req *greetv1.GreetRequest,
+	stream greetv1connect.GreetServiceGreetServerStream,
+) error {
+	for _, prefix := range []string{"Hello", "Bonjour", "Hola"} {
+		if err := stream.Send(&greetv1.GreetResponse{
+			Greeting: fmt.Sprintf("%s, %s!", prefix, req.Name),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+```
+
+The client receives messages until `io.EOF` signals the end of the stream. If
+the handler returned an error, the final `Receive` returns it instead of
+`io.EOF`. `Close` releases the stream's resources; it's idempotent, so defer
+it to clean up even if you abandon the stream early:
+
+```go
+// Client
+stream, err := client.Greet(context.Background(), &greetv1.GreetRequest{Name: "Jane"})
+if err != nil {
+	return err
+}
+defer stream.Close()
+for {
+	res, err := stream.Receive()
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Println(res.Greeting)
+}
+```
 
 In _bidirectional streaming_ (often called bidi), the client and server may
 both send multiple messages. Often, the exchange is structured like a
@@ -82,7 +172,63 @@ service GreetService {
 ```
 
 In Go, bidi streaming RPCs also use the generated stream types, exposing
-`Send` and `Receive` on both sides.
+`Send` and `Receive` on both sides. This handler responds to each message as
+it arrives, and returns once the client's `io.EOF` signals the end of the
+conversation:
+
+```go
+// Handler
+func (s *GreetServer) Greet(
+	ctx context.Context,
+	stream greetv1connect.GreetServiceGreetServerStream,
+) error {
+	for {
+		req, err := stream.Receive()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := stream.Send(&greetv1.GreetResponse{
+			Greeting: fmt.Sprintf("Hello, %s!", req.Name),
+		}); err != nil {
+			return err
+		}
+	}
+}
+```
+
+When the client is done sending, `CloseSend` closes the request side of the
+stream, and a final `Receive` drains the stream to collect the RPC's status:
+`io.EOF` for success, or the handler's error. As with server streams, defer
+`Close` to release the stream's resources:
+
+```go
+// Client
+stream, err := client.Greet(context.Background())
+if err != nil {
+	return err
+}
+defer stream.Close()
+for _, name := range []string{"Jane", "Joe"} {
+	if err := stream.Send(&greetv1.GreetRequest{Name: name}); err != nil {
+		return err
+	}
+	res, err := stream.Receive()
+	if err != nil {
+		return err
+	}
+	fmt.Println(res.Greeting)
+}
+if err := stream.CloseSend(); err != nil {
+	return err
+}
+if _, err := stream.Receive(); !errors.Is(err, io.EOF) {
+	return err
+}
+return nil
+```
 
 ## HTTP representation
 
@@ -121,10 +267,11 @@ or `connect.ServerInterceptor`. Interceptors that need to observe individual
 messages can wrap the `connect.ClientStream` or `connect.ServerStream` before
 passing it along.
 
-## An example
+## A complete example
 
-Let's start by amending the `GreetService` we defined in [Getting
-Started](/docs/go/getting-started/) to make the `Greet` method use client streaming:
+Let's put the pieces together in a complete program, amending the
+`GreetService` we defined in [Getting Started](/docs/go/getting-started/) to
+make the `Greet` method use client streaming:
 
 ```protobuf
 syntax = "proto3";

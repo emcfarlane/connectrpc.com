@@ -45,6 +45,8 @@ override the copy strategy.
 
 The in-process transport isn't limited to tests. It's also useful in
 production for delegating calls between services running in the same process.
+Learn more in the [in-process transport](/docs/go/in-process-transport/)
+documentation.
 
 ## Testing with a running server
 

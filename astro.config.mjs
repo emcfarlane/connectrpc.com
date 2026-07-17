@@ -172,6 +172,10 @@ export default defineConfig({
             { label: "Observability", slug: "docs/go/observability" },
             { label: "Streaming", slug: "docs/go/streaming" },
             { label: "Testing", slug: "docs/go/testing" },
+            {
+              label: "In-process transport",
+              slug: "docs/go/in-process-transport",
+            },
             { label: "Deployment & h2c", slug: "docs/go/deployment" },
             {
               label: "Get Requests and Caching",

@@ -18,14 +18,20 @@ Connect headers are just HTTP headers, modeled using the transport-agnostic
 `Get`, `Set`, `Add`, and `Values`. Access to the headers is done via context,
 which should be familiar to Go developers. On the server, the
 `CallInfoForServerContext` function can be used, which returns a `CallInfo`
-type providing methods for header operations:
+type providing methods for header operations. Always check the second return
+value: it's false when the method isn't invoked through a `connect.Server`,
+such as a direct method call in a test, and accessing the nil `CallInfo`
+panics:
 
 ```go
 func (s *GreetServer) Greet(
 	ctx context.Context,
 	_ *greetv1.GreetRequest,
 ) (*greetv1.GreetResponse, error) {
-	callInfo := connect.CallInfoForServerContext(ctx)
+	callInfo, ok := connect.CallInfoForServerContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeInternal, "no call info in context")
+	}
 	fmt.Println(callInfo.RequestHeader().Get("Acme-Tenant-Id"))
 	res := &greetv1.GreetResponse{}
 	callInfo.ResponseHeader().Set("Greet-Version", "v1")
@@ -71,7 +77,10 @@ func (s *GreetServer) Greet(
 	ctx context.Context,
 	_ *greetv1.GreetRequest,
 ) (*greetv1.GreetResponse, error) {
-	callInfo := connect.CallInfoForServerContext(ctx)
+	callInfo, ok := connect.CallInfoForServerContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeInternal, "no call info in context")
+	}
 	callInfo.ResponseHeader().Set("Greet-Version", "v1")
 	return nil, connect.NewError(connect.CodeUnknown, "oh no!")
 }
@@ -120,7 +129,10 @@ func (s *GreetServer) Greet(
 	ctx context.Context,
 	req *greetv1.GreetRequest,
 ) (*greetv1.GreetResponse, error) {
-	callInfo := connect.CallInfoForServerContext(ctx)
+	callInfo, ok := connect.CallInfoForServerContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeInternal, "no call info in context")
+	}
 	fmt.Println(callInfo.RequestHeader().Get("Acme-Tenant-Id"))
 	callInfo.ResponseHeader().Set(
 		"Greet-Emoji-Bin",
@@ -175,7 +187,10 @@ func (s *GreetServer) Greet(
 	ctx context.Context,
 	req *greetv1.GreetRequest,
 ) (*greetv1.GreetResponse, error) {
-	callInfo := connect.CallInfoForServerContext(ctx)
+	callInfo, ok := connect.CallInfoForServerContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeInternal, "no call info in context")
+	}
 	// Sent as the HTTP header Trailer-Greet-Version.
 	callInfo.ResponseTrailer().Set("Greet-Version", "v1")
 	return &greetv1.GreetResponse{}, nil

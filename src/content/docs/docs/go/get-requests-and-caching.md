@@ -68,8 +68,10 @@ For example, you may wish to set the `Cache-Control` header with a `max-age`
 directive:
 
 ```go
-callInfo := connect.CallInfoForServerContext(ctx)
-callInfo.ResponseHeader().Set("Cache-Control", "max-age=604800")
+callInfo, ok := connect.CallInfoForServerContext(ctx)
+if ok {
+	callInfo.ResponseHeader().Set("Cache-Control", "max-age=604800")
+}
 ```
 
 This would instruct agents and proxies that the request may be cached for up to
@@ -88,14 +90,16 @@ handler can skip its work and return `connecthttp.NewNotModifiedError()` to
 tell the client its cached copy is still fresh:
 
 ```go
-callInfo := connect.CallInfoForServerContext(ctx)
-serverInfo := connecthttp.ServerInfoForContext(ctx)
-if serverInfo.HTTPMethod() == http.MethodGet &&
-	callInfo.RequestHeader().Get("If-None-Match") == etag {
-	callInfo.ResponseHeader().Set("Etag", etag)
-	return nil, connecthttp.NewNotModifiedError()
+callInfo, ok := connect.CallInfoForServerContext(ctx)
+if !ok {
+	return nil, connect.NewError(connect.CodeInternal, "no call info in context")
 }
 callInfo.ResponseHeader().Set("Etag", etag)
+serverInfo, ok := connecthttp.ServerInfoForContext(ctx)
+if ok && serverInfo.HTTPMethod() == http.MethodGet &&
+	callInfo.RequestHeader().Get("If-None-Match") == etag {
+	return nil, connecthttp.NewNotModifiedError()
+}
 // ...build the response as usual...
 ```
 
@@ -112,8 +116,9 @@ handling HTTP GET requests. This can be accomplished using the `HTTPMethod`
 method on the `connecthttp.ServerInfo` type in context:
 
 ```go
-callInfo := connect.CallInfoForServerContext(ctx)
-if info := connecthttp.ServerInfoForContext(ctx); info != nil && info.HTTPMethod() == http.MethodGet {
+callInfo, ok := connect.CallInfoForServerContext(ctx)
+info, httpOK := connecthttp.ServerInfoForContext(ctx)
+if ok && httpOK && info.HTTPMethod() == http.MethodGet {
 	callInfo.ResponseHeader().Set("Cache-Control", "max-age=604800")
 }
 ```

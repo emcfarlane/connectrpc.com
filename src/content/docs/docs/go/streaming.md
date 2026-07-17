@@ -325,7 +325,10 @@ func (s *GreetServer) Greet(
 	ctx context.Context,
 	stream greetv1connect.GreetServiceGreetServerStream,
 ) (*greetv1.GreetResponse, error) {
-	callInfo := connect.CallInfoForServerContext(ctx)
+	callInfo, ok := connect.CallInfoForServerContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeInternal, "no call info in context")
+	}
 	log.Println("Request headers: ", callInfo.RequestHeader())
 	var greeting strings.Builder
 	for {

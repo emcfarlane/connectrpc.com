@@ -64,8 +64,9 @@ func NewAuthClientInterceptor() connect.ClientInterceptor {
 	return func(next connect.ClientFunc) connect.ClientFunc {
 		return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {
 			// Send a token with client requests.
-			info := connect.CallInfoForClientContext(ctx)
-			info.RequestHeader().Set(tokenHeader, "sample")
+			if info, ok := connect.CallInfoForClientContext(ctx); ok {
+				info.RequestHeader().Set(tokenHeader, "sample")
+			}
 			return next(ctx, spec)
 		}
 	}
@@ -75,8 +76,8 @@ func NewAuthServerInterceptor() connect.ServerInterceptor {
 	return func(next connect.ServerFunc) connect.ServerFunc {
 		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
 			// Check the token in handlers.
-			info := connect.CallInfoForServerContext(ctx)
-			if info.RequestHeader().Get(tokenHeader) == "" {
+			info, ok := connect.CallInfoForServerContext(ctx)
+			if !ok || info.RequestHeader().Get(tokenHeader) == "" {
 				return connect.NewError(connect.CodeUnauthenticated, "no token provided")
 			}
 			return next(ctx, spec, stream)

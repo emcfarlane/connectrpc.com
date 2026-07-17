@@ -19,20 +19,17 @@ without a translating proxy like Envoy. Since modern browsers all support
 binary payloads, Connect doesn't support gRPC-Web's text mode: if you're using
 `protoc-gen-grpc-web`, you must use `mode=grpcweb` when generating code.
 
-<!-- TODO(v2): Verify the grpcreflect and grpchealth v2 module paths and
-registration APIs once published. -->
-
 Many gRPC-specific tools depend on server reflection, which lets callers
 access your service's Protobuf schema at runtime. Connect supports server
-reflection with the `connectrpc.com/grpcreflect` package. Keep
+reflection with the `connectrpc.com/grpcreflect/v2` package. Keep
 in mind that there are two versions of the gRPC server reflection API, and many
-tools (including `grpcurl`) still use the older one &mdash; most services
-should mount handlers from both `grpcreflect.NewHandlerV1` and
-`grpcreflect.NewHandlerV1Alpha`.
+tools (including `grpcurl`) still use the older one &mdash;
+`grpcreflect.Register` serves both.
 
 Container orchestration and health-checking systems often support the gRPC
 health checking API. If you'd prefer gRPC-style health checks instead of more
-traditional HTTP checks, use `connectrpc.com/grpchealth`.
+traditional HTTP checks, use `connectrpc.com/grpchealth/v2` and register a
+checker with `grpchealth.Register`.
 
 ## Clients
 

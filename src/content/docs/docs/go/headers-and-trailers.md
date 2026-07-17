@@ -13,7 +13,8 @@ documentation](/docs/go/streaming/) covers headers and trailers for streaming RP
 ## Headers
 
 Connect headers are just HTTP headers, modeled using the transport-agnostic
-`connect.Metadata` type &mdash; a case-insensitive multi-map with methods like
+`connect.Header` type &mdash; a case-insensitive multi-map mirroring
+`net/http.Header`, with methods like
 `Get`, `Set`, `Add`, and `Values`. Access to the headers is done via context,
 which should be familiar to Go developers. On the server, the
 `CallInfoForServerContext` function can be used, which returns a `CallInfo`
@@ -104,7 +105,7 @@ that header keys contain only ASCII letters, numbers, underscores, hyphens, and
 periods, and the protocols reserve all keys beginning with "Connect-" or
 "Grpc-". Similarly, header values may contain only printable ASCII and spaces.
 In our experience, application code writing reserved or non-ASCII headers is
-unusual; rather than wrapping `Metadata` in a fat validation layer, we
+unusual; rather than wrapping `Header` in a fat validation layer, we
 rely on your good judgment.
 
 ## Binary headers

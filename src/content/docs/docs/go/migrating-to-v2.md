@@ -24,14 +24,14 @@ Version 2 of connect-go is available. The key changes are:
 
 If you are using version 1, see our [migration
 guide](https://github.com/connectrpc/connect-go/blob/main/docs/v2-migration.md)
-for a complete walkthrough of every change.
+for a complete walkthrough of every change. Version 1 remains supported: the
+v1 branch continues to receive fixes and security updates, so you can migrate
+at your own pace.
 
 ## Migration tool
 
 Most of the mechanical changes can be applied automatically with the
 `connect-go-v2-migrate` tool:
-
-<!-- TODO(v2): Verify the tool's install path once its module is published. -->
 
 ```shellsession
 $ go install connectrpc.com/connect/v2/cmd/connect-go-v2-migrate@latest
@@ -44,7 +44,3 @@ calls while preserving the v1 wire message, updates Buf generation templates,
 and reports warnings for code that needs a manual update. When v1 generated
 code is present, it first updates the Buf templates and prints the steps to
 generate v2 bindings. Run it again after generation to rewrite Go call sites.
-
-<!-- TODO(v2): Verify the migration guide link resolves once v2 merges to
-main, and link the v2 announcement blog post. Note that v1 remains supported
-on a maintenance branch. -->

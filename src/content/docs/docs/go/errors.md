@@ -42,6 +42,8 @@ func (s *GreetServer) Greet(
 	}
 	greeting, err := doGreetWork(ctx, req)
 	if err != nil {
+		// The cause stays on the server for logging and errors.Is/As;
+		// only the code and message are sent to the client.
 		return nil, connect.NewError(connect.CodeUnknown, "failed to greet").WithCause(err)
 	}
 	return &greetv1.GreetResponse{

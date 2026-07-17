@@ -153,9 +153,6 @@ interfaces and constructors. Feel free to poke around if you're interested
 
 ## Implement handler
 
-<!-- TODO(v2): Verify the validate v2 module path and interceptor constructor
-below once connectrpc.com/validate/v2 is published. -->
-
 The code we've generated takes care of the boring boilerplate, but we still
 need to implement our greeting logic. In the generated code, this is
 represented as the `greetv1connect.GreetServiceHandler` interface. Since the

@@ -2,16 +2,20 @@
 title: Testing
 ---
 
-Connect services are plain Go interfaces, so unit tests can call your handler
-methods directly. To exercise the full RPC path &mdash; interceptors, codecs,
-and error handling &mdash; without binding a port, use the in-process
-transport from `connectrpc.com/connect/v2/connectinprocess`.
+When writing tests for your Connect for Go application, invoke your service
+through a client and a transport, just like production callers. Calling
+service methods directly may seem convenient, but it skips the setup
+performed by `connect.Server`: the context carries no `CallInfo`, and
+interceptors don't run. For most tests, use an in-process server. For tests
+that must cover the wire protocol, run a full HTTP server.
 
-## In-process transport
+## Testing with an in-process server
 
-The in-process transport dispatches RPCs directly to a `connect.Server`
-&mdash; no listeners, no loopback HTTP, and no flaky port management. It runs
-the same interceptor and error paths as a network transport:
+To exercise the full RPC path without binding a port, use the in-process
+transport from `connectrpc.com/connect/v2/connectinprocess`. It dispatches
+RPCs directly to a `connect.Server` without any networking. It sets up the
+context and runs the same interceptor and error paths as a network
+transport:
 
 ```go
 func TestGreetService(t *testing.T) {
@@ -42,11 +46,12 @@ override the copy strategy.
 The in-process transport isn't limited to tests. It's also useful in
 production for delegating calls between services running in the same process.
 
-## Testing over HTTP
+## Testing with a running server
 
-Some tests must cover the wire protocol &mdash; custom codecs, compression,
-or h2c configuration. For those, mount the server on an `httptest.Server` and
-point a `connecthttp` transport at it:
+Running a full HTTP server gives you behavior that is closest to a real
+deployment. Use this approach for tests that must cover the wire protocol,
+such as custom codecs, compression, or h2c configuration. Mount the server on
+an `httptest.Server` and point a `connecthttp` transport at it:
 
 ```go
 func TestGreetServiceHTTP(t *testing.T) {

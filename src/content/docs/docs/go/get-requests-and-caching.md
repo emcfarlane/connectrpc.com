@@ -80,9 +80,30 @@ would specify that the request should only be cached in private caches, such as
 the user agent itself, and *not* CDNs or reverse proxies&mdash;this would be
 appropriate, for example, for authenticated requests.
 
-Handlers can also respond to conditional requests by returning
-`connecthttp.NewNotModifiedError()`, which produces an HTTP 304 Not Modified
-for Connect GET requests.
+Handlers can also support HTTP [conditional
+requests][conditional-requests]. Set an `Etag` header identifying the current
+version of the response. When a client repeats the request, its cache sends
+that value back in the `If-None-Match` header. If the ETag still matches, the
+handler can skip its work and return `connecthttp.NewNotModifiedError()` to
+tell the client its cached copy is still fresh:
+
+```go
+callInfo := connect.CallInfoForServerContext(ctx)
+serverInfo := connecthttp.ServerInfoForContext(ctx)
+if serverInfo.HTTPMethod() == http.MethodGet &&
+	callInfo.RequestHeader().Get("If-None-Match") == etag {
+	callInfo.ResponseHeader().Set("Etag", etag)
+	return nil, connecthttp.NewNotModifiedError()
+}
+callInfo.ResponseHeader().Set("Etag", etag)
+// ...build the response as usual...
+```
+
+"Not modified" is not a failure. Like `io.EOF`, it's a sentinel error used as
+a signal, because a handler has no other way to return without a response
+message. On the wire it becomes HTTP's 304 Not Modified status, which caches
+treat as a successful revalidation. Clients detect the signal with
+`connecthttp.IsNotModifiedError` and reuse the cached response.
 
 ## Distinguishing GET Requests
 
@@ -99,4 +120,5 @@ if info := connecthttp.ServerInfoForContext(ctx); info != nil && info.HTTPMethod
 
 [connect-grpc-bridge-docs]: https://www.envoyproxy.io/docs/envoy/v1.26.0/configuration/http/http_filters/connect_grpc_bridge_filter#config-http-filters-connect-grpc-bridge
 [cache-control-response-directives]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control#response_directives
+[conditional-requests]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Conditional_requests
 [idempotency-level]: https://github.com/protocolbuffers/protobuf/blob/e5679c01e8f47e8a5e7172444676bda1c2ada875/src/google/protobuf/descriptor.proto#L795

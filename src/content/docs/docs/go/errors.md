@@ -87,13 +87,14 @@ A handler that returns a remote error unchanged sends the client a bare
 
 Like `grpc-go`, `connect-go` allows servers to enrich errors with more than
 just a code and a string. Since Connect focuses on schema-first APIs, this
-additional data &mdash; called error details &mdash; is a slice of Protobuf
-messages. Details are commonly used to send
+additional data &mdash; called error details &mdash; is a slice of
+self-describing `ErrorDetail` values. On the Connect, gRPC, and gRPC-Web
+protocols, details are Protobuf messages. Details are commonly used to send
 backoff parameters for transient failures, localized error messages, or other
 structured data. The `google.golang.org/genproto/googleapis/rpc/errdetails`
 package contains a variety of Protobuf messages often used as error details.
-Regardless of the RPC protocol in use, servers can add details to any `*Error`
-with `WithDetail`:
+Regardless of the RPC protocol in use, servers construct details with
+`connectproto.NewErrorDetail` and add them to any `*Error` with `WithDetail`:
 
 ```go
 package example
@@ -102,25 +103,32 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connectproto"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func newTransientError() error {
+	err := connect.NewError(
+		connect.CodeUnavailable,
+		"overloaded: back off and retry",
+	)
 	retryInfo := &errdetails.RetryInfo{
 		RetryDelay: durationpb.New(10 * time.Second),
 	}
-	return connect.NewError(
-		connect.CodeUnavailable,
-		"overloaded: back off and retry",
-	).WithDetail(retryInfo)
+	if detail, detailErr := connectproto.NewErrorDetail(retryInfo); detailErr == nil {
+		err = err.WithDetail(detail)
+	}
+	return err
 }
 ```
 
-`WithDetail` returns a cloned error and never fails. Packing the detail into
-an `anypb.Any` happens when the error is serialized. Clients receive error
-details as `*anypb.Any` values, which they must unmarshal to find any details
-of interest:
+`WithDetail` returns a cloned error. The `ErrorDetail` struct carries the
+message type name and the serialized message, which keeps the core free of a
+Protobuf dependency and lets other transports define their own detail
+encodings. Clients receive details as `*ErrorDetail` values and decode them
+with `connectproto.UnmarshalErrorDetail`, which uses the global type
+registry:
 
 ```go
 package example
@@ -129,9 +137,8 @@ import (
 	"errors"
 
 	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connectproto"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func extractRetryInfo(err error) (*errdetails.RetryInfo, bool) {
@@ -140,12 +147,8 @@ func extractRetryInfo(err error) (*errdetails.RetryInfo, bool) {
 		return nil, false
 	}
 	for _, detail := range connectErr.Details() {
-		anyMsg, ok := detail.(*anypb.Any)
-		if !ok {
-			continue
-		}
-		msg, valueErr := anypb.UnmarshalNew(anyMsg, proto.UnmarshalOptions{})
-		if valueErr != nil {
+		msg, unmarshalErr := connectproto.UnmarshalErrorDetail(detail)
+		if unmarshalErr != nil {
 			// Usually, errors here mean that we don't have the schema for this
 			// Protobuf message.
 			continue
@@ -157,6 +160,9 @@ func extractRetryInfo(err error) (*errdetails.RetryInfo, bool) {
 	return nil, false
 }
 ```
+
+To bridge to gRPC-style APIs that expect an `*anypb.Any`, use
+`connectproto.ErrorDetailToAny`.
 
 Error details work best if they're limited to a small set of stable types used
 by all APIs within your organization. Used sparingly, they're safer, more

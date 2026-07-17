@@ -8,7 +8,8 @@ CORS.
 
 ## Timeouts and connection pools
 
-Connect stays close to `net/http`, so you should configure your servers and
+Connect's HTTP transport, `connecthttp`, stays close to `net/http`, so you
+should configure your servers and
 clients as you normally would. (If you're not sure what all the different
 timeouts mean, [this Cloudflare blog post][cloudflare-timeouts] is a good place
 to start.) There are a few RPC-specific nuances, though:
